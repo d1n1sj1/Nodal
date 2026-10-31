@@ -1,5 +1,5 @@
 // Run the timing test with: cargo test --release -p nodal-core --test speed
-use nodal_core::mna::set_dense_max;
+use nodal_core::mna::{set_dense_max, Stamper};
 use nodal_core::transient::transient;
 use nodal_core::{Circuit, NodeId, Part, PartKind::*, SimError};
 
@@ -24,6 +24,32 @@ fn thousand_node_ladder_transient_under_one_second() {
     assert_eq!(r.times.len(), 1001);
     assert!(r.node_voltages.last().unwrap().iter().all(|v| v.is_finite()));
     assert!(dt.as_secs_f64() < 1.0, "took {dt:?}");
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn thousand_node_ladder_with_diode_transient_under_one_second() {
+    let mut c = ladder(1000);
+    c.parts.push(Part { id: "D1".into(), kind: Diode { anode: NodeId(500), cathode: NodeId(0) } });
+    let t = std::time::Instant::now();
+    let r = transient(&c, 1e-3, 1e-6).unwrap();
+    let dt = t.elapsed();
+    eprintln!("1,000-node ladder + diode, 1,000 steps: {dt:?}");
+    assert_eq!(r.times.len(), 1001);
+    assert!(r.node_voltages.last().unwrap().iter().all(|v| v.is_finite()));
+    assert!(dt.as_secs_f64() < 1.0, "took {dt:?}");
+}
+
+#[test]
+fn sparse_numeric_singular_pivot_is_reported() {
+    // 60 nodes joined only by resistors, no path to ground: every column has entries (not structurally
+    // singular), but the Laplacian is singular, so the last pivot is rounding noise.
+    let mut s = Stamper::new(61, 0);
+    for k in 1..60 { s.conductance(k, k + 1, 1e-3); }
+    set_dense_max(0);
+    let r = s.factor("island");
+    set_dense_max(50);
+    assert!(matches!(r, Err(SimError::Singular(_))));
 }
 
 #[test]
