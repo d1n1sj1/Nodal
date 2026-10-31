@@ -138,9 +138,13 @@ pub(crate) fn junctions(c: &Circuit) -> Vec<Junction> {
     c.parts.iter().filter_map(Junction::of).collect()
 }
 
-/// Shockley current and its slope (no gmin). exp is continued linearly past 80*nVt so it never overflows.
+/// Past XMAX*nVt (~1 V diode, ~2 V LED, ~2.4 kA) the exponential continues as a straight line. This keeps the
+/// companion conductance bounded (~1e5 S), so a bare source across a junction stays well conditioned and
+/// solves to a huge but finite current instead of overflowing or tripping the singular-pivot test.
+const XMAX: f64 = 40.0;
+
+/// Shockley current and its slope (no gmin), linear past XMAX*nVt.
 fn shockley(v: f64, nvt: f64) -> (f64, f64) {
-    const XMAX: f64 = 80.0;
     let x = v / nvt;
     let (e, de) = if x > XMAX { let e = XMAX.exp(); (e * (1.0 + x - XMAX), e) } else { let e = x.exp(); (e, e) };
     (IS * (e - 1.0), IS * de / nvt)
@@ -149,7 +153,8 @@ fn shockley(v: f64, nvt: f64) -> (f64, f64) {
 /// SPICE pnjlim: keeps a forward junction from jumping far up the exponential in one iteration.
 fn pnjlim(vnew: f64, vold: f64, nvt: f64) -> f64 {
     let vcrit = nvt * (nvt / (std::f64::consts::SQRT_2 * IS)).ln();
-    if vnew <= vcrit || (vnew - vold).abs() <= 2.0 * nvt {
+    // Past the knee the model is linear, so a full Newton step is exact; no limiting needed.
+    if vnew <= vcrit || (vnew - vold).abs() <= 2.0 * nvt || vold >= XMAX * nvt {
         return vnew;
     }
     if vold > 0.0 {
@@ -162,12 +167,13 @@ fn pnjlim(vnew: f64, vold: f64, nvt: f64) -> f64 {
 
 /// Newton-Raphson over the junctions. `base` holds the linear stamps (and rhs); each iteration clones it,
 /// adds each junction's companion model and solves. `v0` = starting node voltages (index = NodeId).
-/// Converged when no node moves 1e-6 V or more and every junction's linearisation error is under 1e-9 A.
+/// Converged when no node moves 1e-6 V or more and every junction's linearisation error is under
+/// 1e-9 A + 1e-9 * |I| (relative part keeps huge currents, e.g. a bare LED on 5 V, from failing on rounding).
 pub(crate) fn newton(base: &Stamper, js: &[Junction], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
     let nv = |x: &[f64], i: u32| if i == 0 { 0.0 } else { x[i as usize - 1] };
     let mut prev = v0[1..].to_vec();
     let mut vj: Vec<f64> = js.iter().map(|j| v0[j.a as usize] - v0[j.k as usize]).collect();
-    for _ in 0..max_iters {
+    for it in 1..=max_iters {
         let mut s = base.clone();
         let mut lin = Vec::with_capacity(js.len());
         for (j, &v) in js.iter().zip(&vj) {
@@ -179,17 +185,18 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], v0: &[f64], max_iters: u32
         }
         let x = s.solve(cause)?;
         if x.iter().any(|v| !v.is_finite()) {
-            break;
+            return Err(SimError::NoConvergence { iterations: it });
         }
         let dv = x[..prev.len()].iter().zip(&prev).map(|(a, b)| (a - b).abs()).fold(0.0, f64::max);
-        let mut resid = 0.0f64;
+        let mut resid_ok = true;
         for (idx, j) in js.iter().enumerate() {
             let v = nv(&x, j.a) - nv(&x, j.k);
             let (g, ieq) = lin[idx];
-            resid = resid.max((shockley(v, j.nvt).0 - (g * v + ieq)).abs());
+            let i = shockley(v, j.nvt).0;
+            resid_ok &= (i - (g * v + ieq)).abs() < 1e-9 + 1e-9 * i.abs();
             vj[idx] = pnjlim(v, vj[idx], j.nvt);
         }
-        if dv < 1e-6 && resid < 1e-9 {
+        if dv < 1e-6 && resid_ok {
             return Ok(x);
         }
         let m = prev.len();

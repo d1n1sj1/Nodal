@@ -32,6 +32,12 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
 
 /// DC operating point. Diodes/LEDs are solved by Newton iteration (see `mna::newton`); a linear circuit is one solve.
 pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
+    dc_op_with_limit(c, MAX_NEWTON_ITERS)
+}
+
+/// `dc_op` with a custom Newton iteration cap. Test hook only: lets tests force `NoConvergence`.
+#[doc(hidden)]
+pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimError> {
     validate(c)?;
     let n = c.node_count();
     let mut pins = vec![0u32; n];
@@ -84,7 +90,7 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
     }
     let cause = "voltage sources in a loop or a source across a zero-ohm path";
     let js = junctions(c);
-    let x = if js.is_empty() { s.solve(cause)? } else { newton(&s, &js, &vec![0.0; n], MAX_NEWTON_ITERS, cause)? };
+    let x = if js.is_empty() { s.solve(cause)? } else { newton(&s, &js, &vec![0.0; n], max_iters, cause)? };
 
     let mut node_voltages = vec![0.0; n];
     node_voltages[1..].copy_from_slice(&x[..n - 1]);
