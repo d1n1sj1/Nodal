@@ -1,9 +1,10 @@
 use crate::{transient::TransientResult, Circuit, PartKind};
+use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum DamageKind { OverPower, OverCurrent }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct DamageWarning { pub part_id: String, pub kind: DamageKind, pub peak: f64, pub limit: f64 }
 
 /// Peak of `f` over samples; a non-finite sample counts as an infinite peak (still warns).

@@ -1,0 +1,60 @@
+use nodal_app::commands::*;
+use nodal_core::DamageKind;
+
+const BARE_LED: &str = r#"{"version":1,"parts":[
+ {"id":"V1","kind":"VSource","pos":1,"neg":0,"volts":5.0},
+ {"id":"D1","kind":"Led","anode":1,"cathode":0,"max_amps":0.02}]}"#;
+
+fn tmp(name: &str) -> String {
+    std::env::temp_dir().join(format!("nodal_cmd_{}_{name}", std::process::id())).to_string_lossy().into_owned()
+}
+
+#[test]
+fn run_simulation_returns_warnings_for_bare_led() {
+    let out = run_simulation(BARE_LED.into(), 1e-3, 1e-4).unwrap();
+    assert_eq!(out.times.len(), out.node_voltages.len());
+    let w = out.warnings.iter().find(|w| w.part_id == "D1").expect("LED warning");
+    assert_eq!(w.kind, DamageKind::OverCurrent);
+    assert!(w.peak.is_finite() && w.peak > w.limit);
+    serde_json::to_string(&out).unwrap();
+}
+
+#[test]
+fn run_simulation_bad_json_is_string_error() {
+    assert!(run_simulation("nope".into(), 1.0, 0.1).is_err());
+}
+
+#[test]
+fn load_circuit_unknown_kind_returns_friendly_message() {
+    let p = tmp("unknown.json");
+    std::fs::write(&p, r#"{"version":1,"parts":[{"id":"X1","kind":"Transistor","a":1,"b":0}]}"#).unwrap();
+    let e = load_circuit(p.clone()).unwrap_err();
+    std::fs::remove_file(&p).ok();
+    assert!(e.contains("Transistor") && e.contains("newer version"), "{e}");
+}
+
+#[test]
+fn save_then_load_roundtrips_and_save_rejects_garbage() {
+    let p = tmp("rt.json");
+    save_circuit(p.clone(), BARE_LED.into()).unwrap();
+    assert_eq!(load_circuit(p.clone()).unwrap(), BARE_LED);
+    std::fs::remove_file(&p).ok();
+    let bad = tmp("bad.json");
+    assert!(save_circuit(bad.clone(), "garbage".into()).is_err());
+    assert!(!std::path::Path::new(&bad).exists());
+}
+
+#[test]
+fn non_finite_peak_is_clamped_to_f64_max() {
+    // exercised through the public path: JSON of any output must never contain null peaks
+    let out = run_simulation(BARE_LED.into(), 1e-3, 1e-4).unwrap();
+    let v: serde_json::Value = serde_json::to_value(&out).unwrap();
+    for w in v["warnings"].as_array().unwrap() {
+        assert!(w["peak"].is_number());
+    }
+    let w = clamp_peak(nodal_core::DamageWarning {
+        part_id: "R".into(), kind: DamageKind::OverPower, peak: f64::INFINITY, limit: 1.0,
+    });
+    assert_eq!(w.peak, f64::MAX);
+    assert!(serde_json::to_value(&w).unwrap()["peak"].is_number());
+}

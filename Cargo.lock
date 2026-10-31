@@ -2200,6 +2200,8 @@ name = "nodal-app"
 version = "0.1.0"
 dependencies = [
  "nodal-core",
+ "serde",
+ "serde_json",
  "tauri",
  "tauri-build",
 ]
