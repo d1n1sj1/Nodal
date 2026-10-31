@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react'
 import { beforeEach, expect, test, vi } from 'vitest'
-import type { CircuitJson } from '../sim/api'
+import { buildCircuit } from '../editor/buildCircuit'
+import { addPart, emptySchematic } from '../editor/schematic'
 
 beforeEach(() => {
   localStorage.clear()
@@ -30,7 +31,6 @@ test('set_mode_persists_and_sets_data_mode_attribute', async () => {
 })
 
 test('mode_is_not_in_saved_circuit_json', () => {
-  // Task 11 switches this to real buildCircuit output.
-  const stub: CircuitJson = { version: 1, parts: [] }
-  expect(JSON.stringify(stub)).not.toContain('"mode"')
+  const s = addPart(emptySchematic(), 'Resistor', { x: 0, y: 0 })
+  expect(JSON.stringify(buildCircuit(s))).not.toContain('"mode"')
 })

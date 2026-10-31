@@ -43,6 +43,7 @@ pub fn run_simulation(circuit_json: String, stop: f64, step: f64) -> Result<SimO
     run_simulation_impl(&circuit_json, stop, step)
 }
 
+/// `path` always comes from the native dialog plugin (the UI never builds paths itself).
 #[tauri::command]
 pub fn save_circuit(path: String, circuit_json: String) -> Result<(), String> {
     save_circuit_impl(&path, &circuit_json)

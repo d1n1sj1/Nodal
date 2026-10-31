@@ -1,11 +1,45 @@
+import { useState } from 'react'
+import { open, save } from '@tauri-apps/plugin-dialog'
 import Palette from './panels/Palette'
 import Logo from './brand/Logo'
+import Canvas from './editor/Canvas'
+import { buildCircuit } from './editor/buildCircuit'
+import { schematicFromCircuit } from './editor/fromCircuit'
+import { emptySchematic, type Schematic } from './editor/schematic'
 import { useMode, type Mode } from './modes/mode'
+import type { PartDef } from './parts/registry'
+import { loadCircuit, saveCircuit } from './sim/api'
 import './modes/theme.css'
+
+const filters = [{ name: 'Nodal circuit', extensions: ['json'] }]
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 function App() {
   const { mode, setMode } = useMode()
+  const [schematic, setSchematic] = useState<Schematic>(emptySchematic)
+  const [placing, setPlacing] = useState<PartDef | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const modes: [Mode, string][] = [['engineer', 'Engineer'], ['kids', 'Kids']]
+
+  const onSave = async () => {
+    try {
+      const path = await save({ filters })
+      if (path) await saveCircuit(path, buildCircuit(schematic))
+      setError(null)
+    } catch (e) {
+      setError(`Could not save the circuit: ${message(e)}`)
+    }
+  }
+  const onOpen = async () => {
+    try {
+      const path = await open({ multiple: false, filters })
+      if (typeof path === 'string') setSchematic(schematicFromCircuit(await loadCircuit(path)))
+      setError(null)
+    } catch (e) {
+      setError(`Could not open that file: ${message(e)}`)
+    }
+  }
+
   return (
     <div className="app" data-mode={mode}>
       <header className="app-header">
@@ -13,6 +47,10 @@ function App() {
           <Logo />
           {mode === 'kids' && <span className="kids-tag">Kids</span>}
         </span>
+        <div className="file-actions">
+          <button type="button" onClick={onOpen}>Open</button>
+          <button type="button" onClick={onSave}>Save</button>
+        </div>
         <div className="mode-switch" role="group" aria-label="Mode">
           {modes.map(([m, label]) => (
             <button key={m} type="button" aria-pressed={mode === m} onClick={() => setMode(m)}>
@@ -22,8 +60,11 @@ function App() {
         </div>
       </header>
       <div className="app-body">
-        <Palette mode={mode} onPick={() => {}} />
-        <main className="app-main" />
+        <Palette mode={mode} onPick={setPlacing} />
+        <main className="app-main">
+          {error && <p className="app-error" role="alert">{error}</p>}
+          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} />
+        </main>
       </div>
     </div>
   )
