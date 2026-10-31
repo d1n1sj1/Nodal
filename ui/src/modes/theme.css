@@ -1,0 +1,61 @@
+:root,
+[data-mode='engineer'] {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --text: #e6e8ee;
+  --muted: #7c85a2;
+  --border: #262b36;
+  --accent: #6366f1;
+  --accent2: #34d399;
+  --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  --radius: 12px;
+  color-scheme: dark;
+}
+[data-mode='kids'] {
+  --bg: #eef6ff;
+  --panel: #ffffff;
+  --text: #1e293b;
+  --muted: #64748b;
+  --border: #bfdbfe;
+  --accent: #3b82f6;
+  --accent2: #34d399;
+  --coral: #fb7185;
+  --shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+  --radius: 18px;
+  color-scheme: light;
+}
+body { margin: 0; }
+.app {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+}
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.brand, .logo { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.kids-tag {
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  background: #dbeafe;
+}
+.mode-switch { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
+.mode-switch button {
+  border: 0; border-radius: 999px; padding: 4px 14px; cursor: pointer;
+  background: transparent; color: var(--muted); font: inherit;
+}
+.mode-switch button[aria-pressed='true'] { background: var(--accent); color: #fff; }
+.app-main { flex: 1; }
