@@ -1,3 +1,4 @@
+import Palette from './panels/Palette'
 import Logo from './brand/Logo'
 import { useMode, type Mode } from './modes/mode'
 import './modes/theme.css'
@@ -20,7 +21,10 @@ function App() {
           ))}
         </div>
       </header>
-      <main className="app-main" />
+      <div className="app-body">
+        <Palette mode={mode} onPick={() => {}} />
+        <main className="app-main" />
+      </div>
     </div>
   )
 }
