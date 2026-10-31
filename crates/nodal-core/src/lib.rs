@@ -2,6 +2,7 @@ pub mod dc;
 mod error;
 pub mod mna;
 mod model;
+pub mod transient;
 pub use error::SimError;
 pub use model::{Circuit, NodeId, Part, PartKind};
 
