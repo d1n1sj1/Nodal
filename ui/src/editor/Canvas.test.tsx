@@ -73,3 +73,9 @@ test('space_on_unarmed_svg_is_default_prevented', () => {
   render(<Canvas schematic={emptySchematic()} onChange={() => {}} mode="engineer" />)
   expect(fireEvent.keyDown(screen.getByRole('application'), { key: ' ' })).toBe(false)
 })
+
+test('warned_part_gets_damaged_marker_and_label', () => {
+  const s = addPart(emptySchematic(), 'Resistor', { x: 100, y: 100 })
+  render(<Canvas schematic={s} onChange={vi.fn()} mode="engineer" damaged={new Set(['p1'])} />)
+  expect(screen.getByRole('group', { name: /p1 — warning/ }).getAttribute('class')).toContain('damaged')
+})

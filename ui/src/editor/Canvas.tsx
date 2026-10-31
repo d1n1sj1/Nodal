@@ -14,9 +14,11 @@ interface Props {
   /** Palette pick waiting for a canvas click. */
   placing?: PartDef | null
   onPlaced?: () => void
+  /** Placed-part ids with damage warnings: drawn red. */
+  damaged?: Set<string>
 }
 
-export default function Canvas({ schematic, onChange, mode, placing, onPlaced }: Props) {
+export default function Canvas({ schematic, onChange, mode, placing, onPlaced, damaged }: Props) {
   const svg = useRef<SVGSVGElement>(null)
   const drag = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const [selected, setSelected] = useState<string | null>(null) // "part:<id>" | "wire:<index>"
@@ -101,8 +103,8 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
         const tile = kids ? tileFor(p.def) : null
         const Icon = tile ? tile.picture : p.def.symbol
         return (
-          <g key={p.id} data-part-id={p.id} role="group" aria-label={p.def.kind === 'Ground' ? p.def.name : `${tile ? tile.name : p.def.name} ${p.id}`}
-            className={`placed ${selected === `part:${p.id}` ? 'selected' : ''}`} transform={`translate(${p.pos.x} ${p.pos.y})`}
+          <g key={p.id} data-part-id={p.id} role="group" aria-label={(p.def.kind === 'Ground' ? p.def.name : `${tile ? tile.name : p.def.name} ${p.id}`) + (damaged?.has(p.id) ? ' — warning' : '')}
+            className={`placed ${damaged?.has(p.id) ? 'damaged' : ''} ${selected === `part:${p.id}` ? 'selected' : ''}`} transform={`translate(${p.pos.x} ${p.pos.y})`}
             onMouseDown={(e) => {
               e.stopPropagation()
               setSelected(`part:${p.id}`)
@@ -111,6 +113,7 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            {damaged?.has(p.id) && <rect className="damage-halo" x={-PART_HALF_WIDTH - 4} y="-26" width={PART_HALF_WIDTH * 2 + 8} height="52" rx="12" />}
             <g role="button" tabIndex={0} aria-label={`Select ${tile ? tile.name : p.def.name} ${p.id}`}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSelected(`part:${p.id}`) } }}>
             {tile ? (

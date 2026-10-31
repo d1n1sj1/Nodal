@@ -7,6 +7,8 @@
   --border: #262b36;
   --accent: #6366f1;
   --accent2: #34d399;
+  --danger: #f87171;
+  --danger-tint: rgba(248, 113, 113, 0.18);
   --shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   --radius: 12px;
   color-scheme: dark;
@@ -20,6 +22,8 @@
   --accent: #3b82f6;
   --accent2: #34d399;
   --coral: #fb7185;
+  --danger: #dc2626;
+  --danger-tint: #fee2e2;
   --shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
   --radius: 18px;
   color-scheme: light;
@@ -94,3 +98,8 @@ body { margin: 0; }
 .scope-cursor { stroke: var(--accent); stroke-dasharray: 3 3; }
 .readouts { display: flex; flex-direction: column; gap: 6px; font-variant-numeric: tabular-nums; }
 .readouts-kids { font-size: 22px; }
+
+.canvas .damage-halo { fill: var(--danger-tint); stroke: var(--danger); stroke-width: 3; pointer-events: none; }
+.canvas .placed.damaged { color: var(--danger); }
+.warning-banner { margin: 0; padding: 8px 12px; color: var(--text); background: var(--danger-tint); border-left: 4px solid var(--danger); }
+.warning-banner ul { margin: 0; padding-left: 18px; }

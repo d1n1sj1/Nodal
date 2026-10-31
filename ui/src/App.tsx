@@ -11,6 +11,8 @@ import type { PartDef } from './parts/registry'
 import RunBar from './panels/RunBar'
 import Scope from './panels/Scope'
 import Readouts from './panels/Readouts'
+import WarningBanner from './panels/WarningBanner'
+import { damagedIds } from './panels/warningText'
 import { loadCircuit, saveCircuit, type SimOutput } from './sim/api'
 import './modes/theme.css'
 
@@ -71,7 +73,8 @@ function App() {
         <Palette mode={mode} onPick={setPlacing} />
         <main className="app-main">
           {error && <p className="app-error" role="alert">{error}</p>}
-          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} />
+          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} damaged={damagedIds(result?.warnings)} />
+          <WarningBanner warnings={result?.warnings} mode={mode} schematic={schematic} />
           <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
           {result && (
             <section className="results">
