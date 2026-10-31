@@ -14,8 +14,9 @@ export default function Scope({ output, selectedNode, onCursor }: Props) {
   const t0 = n ? times[0] : 0
   let t1 = n ? times[n - 1] : 1
   if (t1 <= t0) t1 = t0 + 1
-  let lo = n ? Math.min(...ys) : 0
-  let hi = n ? Math.max(...ys) : 1
+  let lo = n ? Infinity : 0 // loop, not Math.min(...ys): spread overflows the stack on huge arrays
+  let hi = n ? -Infinity : 1
+  for (let i = 0; i < n; i++) { if (ys[i] < lo) lo = ys[i]; if (ys[i] > hi) hi = ys[i] }
   if (hi - lo < 1e-12) { lo -= 0.5; hi += 0.5 } // flat line: give it a visible range
   const x = (t: number) => L + ((t - t0) / (t1 - t0)) * (W - L - R)
   const y = (v: number) => T + (1 - (v - lo) / (hi - lo)) * (H - T - B)

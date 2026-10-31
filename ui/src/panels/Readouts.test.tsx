@@ -25,6 +25,17 @@ test('formatSI_edge_cases', () => {
   expect(formatSI(Infinity, 'V')).toBe('—')
 })
 
+test('formatSI_rounding_boundaries', () => {
+  expect(formatSI(99.96, 'V')).toBe('100 V')
+  expect(formatSI(9.996, 'V')).toBe('10.0 V')
+  expect(formatSI(-1e-15, 'A')).toBe('0.00 pA')
+})
+
+test('scope_handles_300k_points', () => {
+  const { container } = render(<Scope output={mk(300000, (i) => i % 7)} selectedNode={1} />)
+  expect(container.querySelector('polyline')).toBeTruthy()
+})
+
 const mk = (n: number, v: (i: number) => number): SimOutput => ({
   times: Array.from({ length: n }, (_, i) => i * 1e-3),
   node_voltages: Array.from({ length: n }, (_, i) => [0, v(i)]),

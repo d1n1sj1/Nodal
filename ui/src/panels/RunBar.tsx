@@ -7,6 +7,8 @@ import { parseSI } from './formatSI'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
+const MAX_STEPS = 1e6
+
 interface Props { schematic: Schematic; onResult: (o: SimOutput) => void; mode?: Mode }
 
 export default function RunBar({ schematic, onResult, mode = 'engineer' }: Props) {
@@ -20,6 +22,7 @@ export default function RunBar({ schematic, onResult, mode = 'engineer' }: Props
     const stopS = parseSI(stop)
     const stepS = parseSI(step)
     if (!(stopS > 0) || !(stepS > 0)) return setError('Enter positive times like 10m, 10u or 0.01.')
+    if (stopS / stepS > MAX_STEPS) return setError('That would need too many steps: try a shorter time or a bigger step.')
     const circuit = buildCircuit(schematic)
     if (circuit.parts.length === 0) return setError('Nothing to simulate yet: add some parts first.')
     const id = ++latest.current

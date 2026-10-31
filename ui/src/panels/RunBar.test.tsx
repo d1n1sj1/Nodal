@@ -60,3 +60,12 @@ test('kids_label_is_play', () => {
   render(<RunBar schematic={emptySchematic()} onResult={vi.fn()} mode="kids" />)
   expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy()
 })
+
+test.each([['1e999', '10u'], ['10m', '1e999'], ['1', '1p']])('bad_bounds_%s_%s_show_message_and_do_not_call', (stop, step) => {
+  render(<RunBar schematic={withPart()} onResult={vi.fn()} mode="engineer" />)
+  fireEvent.change(screen.getByLabelText('Stop time'), { target: { value: stop } })
+  fireEvent.change(screen.getByLabelText('Step'), { target: { value: step } })
+  fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+  expect(screen.getByRole('alert')).toBeTruthy()
+  expect(runSimulation).not.toHaveBeenCalled()
+})
