@@ -13,5 +13,22 @@
     "windows": [{ "title": "Nodal", "width": 1200, "height": 800 }],
     "security": { "csp": null }
   },
-  "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.ico"] }
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "publisher": "Nodal contributors",
+    "copyright": "Copyright (c) Nodal contributors. MIT OR Apache-2.0",
+    "license": "MIT OR Apache-2.0",
+    "licenseFile": "../LICENSE-MIT",
+    "category": "Education",
+    "shortDescription": "Open-source circuit simulator",
+    "longDescription": "Nodal is an open-source circuit simulator with a fast Rust core, DC operating point and transient analysis, and Kids and Engineer modes."
+  }
 }
