@@ -1,6 +1,6 @@
 use crate::dc::{dc_op, validate};
 use crate::mna::{junctions, newton, Junction, Stamper, MAX_NEWTON_ITERS};
-use crate::{Circuit, NodeId, Part, PartKind::*, SimError};
+use crate::{Circuit, NodeId, PartKind::*, SimError};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -94,7 +94,8 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
             branch_of.insert(p.id.as_str(), branch_of.len());
         }
     }
-    let row = |p: &Part| n - 1 + branch_of[p.id.as_str()];
+    // Matrix row of each part's branch unknown (unused for parts without one); avoids per-step map lookups.
+    let rows: Vec<usize> = c.parts.iter().map(|p| branch_of.get(p.id.as_str()).map_or(0, |k| n - 1 + k)).collect();
     let vd = |v: &[f64], a: NodeId, b: NodeId| v[a.0 as usize] - v[b.0 as usize];
 
     let mut s = Stamper::new(n, branch_of.len());
@@ -115,6 +116,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
         }
     }
     let base = s.rhs.clone();
+    let mut rhs = base.clone();
     let js = junctions(c);
     // Linear fast path: factor once. Nonlinear: newton re-stamps from a clone of `s` every iteration.
     let fast = if js.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
@@ -126,12 +128,14 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
         _ => 0.0,
     }).collect();
 
-    let mut times = vec![0.0];
-    let mut part_currents: HashMap<String, Vec<f64>> = c.parts.iter().map(|p| (p.id.clone(), vec![init.part_currents[&p.id]])).collect();
-    let mut node_voltages = vec![init.node_voltages];
+    let mut times = Vec::with_capacity(steps + 1);
+    times.push(0.0);
+    let mut currents: Vec<Vec<f64>> = ist.iter().map(|&i| { let mut v = Vec::with_capacity(steps + 1); v.push(i); v }).collect();
+    let mut node_voltages = Vec::with_capacity(steps + 1);
+    node_voltages.push(init.node_voltages);
 
     for k in 1..=steps {
-        let mut rhs = base.clone();
+        rhs.copy_from_slice(&base);
         for (i, p) in c.parts.iter().enumerate() {
             match p.kind {
                 Capacitor { a, b, farads } => {
@@ -139,7 +143,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                     if a.0 != 0 { rhs[a.0 as usize - 1] += hist; }
                     if b.0 != 0 { rhs[b.0 as usize - 1] -= hist; }
                 }
-                Inductor { henries, .. } => rhs[row(p)] = -(2.0 * henries / step * ist[i] + vst[i]),
+                Inductor { henries, .. } => rhs[rows[i]] = -(2.0 * henries / step * ist[i] + vst[i]),
                 _ => {}
             }
         }
@@ -147,7 +151,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
             Some(f) => f.solve(&rhs),
             None => {
                 let mut st = s.clone();
-                st.rhs = rhs;
+                st.rhs.copy_from_slice(&rhs);
                 newton(&st, &js, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
             }
         };
@@ -158,8 +162,8 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                 Resistor { a, b, ohms, .. } => vd(&v, a, b) / ohms,
                 ISource { amps, .. } => amps,
                 Switch { a, b, closed: false } => vd(&v, a, b) * OPEN_SWITCH_SIEMENS,
-                VSource { .. } | Switch { .. } => x[row(p)],
-                Inductor { a, b, .. } => { vst[i] = vd(&v, a, b); x[row(p)] }
+                VSource { .. } | Switch { .. } => x[rows[i]],
+                Inductor { a, b, .. } => { vst[i] = vd(&v, a, b); x[rows[i]] }
                 Capacitor { a, b, farads } => {
                     let vn = vd(&v, a, b);
                     let cur = 2.0 * farads / step * (vn - vst[i]) - ist[i];
@@ -169,10 +173,11 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                 Diode { .. } | Led { .. } => Junction::of(p).unwrap().current(&v),
             };
             ist[i] = cur;
-            part_currents.get_mut(&p.id).unwrap().push(cur);
+            currents[i].push(cur);
         }
         times.push(k as f64 * step);
         node_voltages.push(v);
     }
+    let part_currents = c.parts.iter().map(|p| p.id.clone()).zip(currents).collect();
     Ok(TransientResult { times, node_voltages, part_currents })
 }
