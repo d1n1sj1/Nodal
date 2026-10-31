@@ -16,6 +16,16 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
     if c.parts.is_empty() {
         return Err(SimError::EmptyCircuit);
     }
+    for p in &c.parts {
+        let ok = match p.kind {
+            Resistor { ohms, .. } => ohms.is_finite() && ohms > 0.0,
+            Capacitor { farads: x, .. } | Inductor { henries: x, .. } | VSource { volts: x, .. } | ISource { amps: x, .. } => x.is_finite(),
+            _ => true,
+        };
+        if !ok {
+            return Err(SimError::Singular(format!("part {} has an invalid value (must be finite, and resistance above zero)", p.id)));
+        }
+    }
     let n = c.node_count();
     let mut pins = vec![0u32; n];
     for p in &c.parts {
@@ -25,6 +35,24 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
         return Err(SimError::NoGround);
     }
     if let Some(i) = (1..n).find(|&i| pins[i] < 2) {
+        return Err(SimError::FloatingNode(i as u32));
+    }
+
+    // Every node needs a DC path to ground (capacitors, diodes, LEDs, current sources and open switches carry none).
+    let mut uf: Vec<usize> = (0..n).collect();
+    fn find(uf: &mut [usize], mut x: usize) -> usize {
+        while uf[x] != x { uf[x] = uf[uf[x]]; x = uf[x]; }
+        x
+    }
+    for p in &c.parts {
+        if matches!(p.kind, Resistor { .. } | Inductor { .. } | VSource { .. } | Switch { closed: true, .. }) {
+            let [x, y] = p.nodes();
+            let (rx, ry) = (find(&mut uf, x as usize), find(&mut uf, y as usize));
+            uf[rx] = ry;
+        }
+    }
+    let g = find(&mut uf, 0);
+    if let Some(i) = (1..n).find(|&i| find(&mut uf, i) != g) {
         return Err(SimError::FloatingNode(i as u32));
     }
 
@@ -47,7 +75,7 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
             Capacitor { .. } | Diode { .. } | Led { .. } => {} // open in DC / nonlinear parts arrive in Task 5
         }
     }
-    let x = s.solve()?;
+    let x = s.solve("voltage sources in a loop or a source across a zero-ohm path")?;
 
     let mut node_voltages = vec![0.0; n];
     node_voltages[1..].copy_from_slice(&x[..n - 1]);

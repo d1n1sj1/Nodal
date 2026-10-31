@@ -45,3 +45,40 @@ fn voltage_source_loop_is_singular() {
 fn empty_circuit_is_error() {
     assert_eq!(dc_op(&Circuit::default()).unwrap_err(), SimError::EmptyCircuit);
 }
+
+#[test]
+fn zero_ohm_and_nan_are_errors() {
+    let z = p("R0", Resistor { a: n(1), b: n(0), ohms: 0.0, max_watts: 1.0 });
+    let c = Circuit { parts: vec![v("V1", 1, 5.0), z] };
+    assert!(matches!(dc_op(&c), Err(SimError::Singular(m)) if m.contains("R0")));
+    let c = Circuit { parts: vec![v("V1", 1, f64::NAN), r("R1", 1, 0)] };
+    assert!(dc_op(&c).is_err());
+}
+
+#[test]
+fn ill_scaled_circuit_solves() {
+    let rr = |id, a, b, ohms| p(id, Resistor { a: n(a), b: n(b), ohms, max_watts: 1.0 });
+    let c = Circuit { parts: vec![v("V1", 1, 10.0), rr("A", 1, 2, 1e-3), rr("B", 2, 3, 1e9), rr("C", 3, 0, 1e12)] };
+    let d = dc_op(&c).unwrap();
+    let want = 10.0 * 1e12 / (1e-3 + 1e9 + 1e12);
+    assert!((d.node_voltages[3] - want).abs() < 1e-6, "{}", d.node_voltages[3]);
+}
+
+#[test]
+fn singular_message_names_cause() {
+    let c = Circuit { parts: vec![v("V1", 1, 5.0), v("V2", 1, 3.0)] };
+    assert!(matches!(dc_op(&c), Err(SimError::Singular(m)) if m.contains("voltage sources in a loop")));
+}
+
+#[test]
+fn series_capacitor_node_is_floating() {
+    let cap = p("C1", Capacitor { a: n(1), b: n(2), farads: 1e-6 });
+    let c = Circuit { parts: vec![v("V1", 1, 5.0), cap, r("R1", 2, 3), r("R2", 3, 2)] };
+    assert_eq!(dc_op(&c).unwrap_err(), SimError::FloatingNode(2));
+}
+
+#[test]
+fn isolated_resistor_island_is_floating() {
+    let c = Circuit { parts: vec![v("V1", 1, 5.0), r("R1", 1, 0), r("R2", 2, 3), r("R3", 3, 2)] };
+    assert_eq!(dc_op(&c).unwrap_err(), SimError::FloatingNode(2));
+}

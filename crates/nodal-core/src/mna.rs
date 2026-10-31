@@ -44,12 +44,14 @@ impl Stamper {
     }
 
     /// Solves in place; returns unknowns in index order.
-    pub fn solve(mut self) -> Result<Vec<f64>, SimError> {
+    pub fn solve(mut self, cause: &str) -> Result<Vec<f64>, SimError> {
         let n = self.rhs.len();
+        // Per-column scale makes the pivot test robust to wide resistor ranges.
+        let scale: Vec<f64> = (0..n).map(|c| self.a.iter().map(|r| r[c].abs()).fold(0.0, f64::max)).collect();
         for c in 0..n {
             let p = (c..n).max_by(|&x, &y| self.a[x][c].abs().total_cmp(&self.a[y][c].abs())).unwrap();
-            if self.a[p][c].abs() < 1e-15 {
-                return Err(SimError::Singular("voltage sources in a loop or a source across a zero-ohm path".into()));
+            if !(self.a[p][c].abs() > 1e-12 * scale[c]) {
+                return Err(SimError::Singular(cause.into()));
             }
             self.a.swap(c, p);
             self.rhs.swap(c, p);
