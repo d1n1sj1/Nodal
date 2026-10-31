@@ -80,3 +80,17 @@ body { margin: 0; }
 .app-error { margin: 0; padding: 8px 12px; color: #b91c1c; }
 .file-actions { display: flex; gap: 6px; margin-left: auto; margin-right: 12px; }
 .canvas:focus-visible, .canvas :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.runbar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--border); }
+.runbar input { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; }
+.run-btn { border: 0; border-radius: var(--radius); padding: 6px 18px; font: inherit; font-weight: 600; background: var(--accent2); color: #0f1115; cursor: pointer; }
+.run-btn:disabled { opacity: 0.5; cursor: default; }
+.runbar-error { color: #b91c1c; }
+.results { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 12px; background: var(--panel); border-top: 1px solid var(--border); }
+.scope { width: 480px; max-width: 100%; background: var(--bg); border-radius: var(--radius); }
+.scope-frame { fill: none; stroke: var(--border); }
+.scope-tick { fill: var(--muted); font-size: 10px; }
+.scope-line { stroke: var(--accent2); stroke-width: 2; }
+.scope-cursor { stroke: var(--accent); stroke-dasharray: 3 3; }
+.readouts { display: flex; flex-direction: column; gap: 6px; font-variant-numeric: tabular-nums; }
+.readouts-kids { font-size: 22px; }

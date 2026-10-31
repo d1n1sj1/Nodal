@@ -8,7 +8,10 @@ import { schematicFromCircuit } from './editor/fromCircuit'
 import { emptySchematic, type Schematic } from './editor/schematic'
 import { useMode, type Mode } from './modes/mode'
 import type { PartDef } from './parts/registry'
-import { loadCircuit, saveCircuit } from './sim/api'
+import RunBar from './panels/RunBar'
+import Scope from './panels/Scope'
+import Readouts from './panels/Readouts'
+import { loadCircuit, saveCircuit, type SimOutput } from './sim/api'
 import './modes/theme.css'
 
 const filters = [{ name: 'Nodal circuit', extensions: ['json'] }]
@@ -19,6 +22,11 @@ function App() {
   const [schematic, setSchematic] = useState<Schematic>(emptySchematic)
   const [placing, setPlacing] = useState<PartDef | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [result, setResult] = useState<SimOutput | null>(null)
+  const [node, setNode] = useState<number | null>(null)
+  const [cursor, setCursor] = useState<number | null>(null)
+  const nodes = result?.node_voltages[0]?.length ?? 0
+  const selected = node !== null && node < nodes ? node : Math.max(0, nodes - 1)
   const modes: [Mode, string][] = [['engineer', 'Engineer'], ['kids', 'Kids']]
 
   const onSave = async () => {
@@ -64,6 +72,18 @@ function App() {
         <main className="app-main">
           {error && <p className="app-error" role="alert">{error}</p>}
           <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} />
+          <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
+          {result && (
+            <section className="results">
+              <label>Node{' '}
+                <select aria-label="Node" value={selected} onChange={(e) => setNode(Number(e.target.value))}>
+                  {Array.from({ length: nodes }, (_, i) => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </label>
+              <Scope output={result} selectedNode={selected} onCursor={setCursor} />
+              <Readouts output={result} cursorTime={cursor} selectedNode={selected} mode={mode} />
+            </section>
+          )}
         </main>
       </div>
     </div>
