@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent } from 'react'
 import type { Mode } from '../modes/mode'
 import type { PartDef } from '../parts/registry'
 import { tileFor } from '../parts/tiles'
-import { addPart, addWire, movePart, pinCount, pinPos, removePart, removeWire, PART_HALF_WIDTH, type Pin, type Pos, type Schematic } from './schematic'
+import { addPart, addWire, movePart, pinCount, pinPos, removePart, removeWire, PART_HALF_WIDTH, PART_HALF_HEIGHT, type Pin, type Pos, type Schematic } from './schematic'
 
 const GRID = 20
 const snap = (n: number) => Math.round(n / GRID) * GRID
@@ -45,9 +45,11 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.target === e.currentTarget && [' ', 'Enter', 'Delete', 'Backspace'].includes(e.key)) e.preventDefault() // no page scroll / navigation
     if ((e.key === 'Enter' || e.key === ' ') && placing && e.target === e.currentTarget) {
-      e.preventDefault()
-      const taken = (x: number, y: number) => schematic.parts.some((p) => p.pos.x === x && p.pos.y === y)
+      // taken = bounding box (68x44 + margin) overlaps any existing part, on-grid or not
+      const taken = (x: number, y: number) =>
+        schematic.parts.some((p) => Math.abs(p.pos.x - x) < PART_HALF_WIDTH * 2 + 12 && Math.abs(p.pos.y - y) < PART_HALF_HEIGHT * 2 + 24)
       let k = 0 // next free cell in a 6-wide layout
       while (taken(100 + (k % 6) * 140, 100 + Math.floor(k / 6) * 100)) k++
       onChange(addPart(schematic, placing, { x: 100 + (k % 6) * 140, y: 100 + Math.floor(k / 6) * 100 }))
@@ -99,7 +101,7 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
         const tile = kids ? tileFor(p.def) : null
         const Icon = tile ? tile.picture : p.def.symbol
         return (
-          <g key={p.id} data-part-id={p.id} role="group" aria-label={`${tile ? tile.name : p.def.name} ${p.id}`}
+          <g key={p.id} data-part-id={p.id} role="group" aria-label={p.def.kind === 'Ground' ? p.def.name : `${tile ? tile.name : p.def.name} ${p.id}`}
             className={`placed ${selected === `part:${p.id}` ? 'selected' : ''}`} transform={`translate(${p.pos.x} ${p.pos.y})`}
             onMouseDown={(e) => {
               e.stopPropagation()

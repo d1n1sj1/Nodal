@@ -11,6 +11,7 @@ export const emptySchematic = (): Schematic => ({ parts: [], wires: [] })
 export const pinCount = (p: PlacedPart) => (p.def.kind === 'Ground' ? 1 : 2)
 
 export const PART_HALF_WIDTH = 34
+export const PART_HALF_HEIGHT = 22
 /** Canvas position of a pin: two-pin parts left/right, Ground on top. */
 export const pinPos = (p: PlacedPart, i: number): Pos =>
   p.def.kind === 'Ground' ? { x: p.pos.x, y: p.pos.y - 16 } : { x: p.pos.x + (i ? PART_HALF_WIDTH : -PART_HALF_WIDTH), y: p.pos.y }

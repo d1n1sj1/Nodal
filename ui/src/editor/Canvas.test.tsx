@@ -59,3 +59,17 @@ test('keyboard_places_armed_part_in_next_free_cell', () => {
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
   expect(onChange.mock.calls[0][0].parts[1].pos).toEqual({ x: 240, y: 100 })
 })
+
+test('keyboard_placement_avoids_off_grid_overlap', () => {
+  const onChange = vi.fn()
+  const s = addPart(emptySchematic(), 'Resistor', { x: 130, y: 90 }) // loaded off-grid, overlaps cell (100,100)
+  render(<Canvas schematic={s} onChange={onChange} mode="engineer" placing={partDefs[0]} />)
+  fireEvent.keyDown(screen.getByRole('application'), { key: ' ' })
+  const { x, y } = onChange.mock.calls[0][0].parts[1].pos
+  expect(Math.abs(x - 130) >= 68 || Math.abs(y - 90) >= 44).toBe(true)
+})
+
+test('space_on_unarmed_svg_is_default_prevented', () => {
+  render(<Canvas schematic={emptySchematic()} onChange={() => {}} mode="engineer" />)
+  expect(fireEvent.keyDown(screen.getByRole('application'), { key: ' ' })).toBe(false)
+})
