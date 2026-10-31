@@ -54,6 +54,12 @@ fn closed_switch_conducts() {
 }
 
 #[test]
+fn oversized_result_is_rejected_before_allocating() {
+    // 1e7 steps is within the step cap, but 1e7 * (3 nodes + 3 parts) exceeds the stored-value cap.
+    assert!(transient(&switch_circuit(true), 10.0, 1e-6).is_err());
+}
+
+#[test]
 fn step_must_be_positive() {
     let c = switch_circuit(true);
     assert!(transient(&c, 1e-3, 0.0).is_err());

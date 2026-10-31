@@ -50,12 +50,6 @@ impl Stamper {
         self.a[row][row] -= r;
     }
 
-    /// Zeroes every stamp and the rhs so the stamper can be re-stamped (Newton iterations).
-    pub fn reset(&mut self) {
-        self.a.iter_mut().for_each(|r| r.fill(0.0));
-        self.rhs.fill(0.0);
-    }
-
     /// LU-factors the matrix (rhs ignored). Reuse the result for many right-hand sides.
     pub fn factor(mut self, cause: &str) -> Result<Factor, SimError> {
         let n = self.rhs.len();

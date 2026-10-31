@@ -15,6 +15,7 @@ pub struct TransientResult {
 
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
 const MAX_STEPS: f64 = 1e7;
+const MAX_VALUES: f64 = 5e7;
 const CAUSE: &str = "transient matrix is singular: voltage sources in a loop or a source across a zero-ohm path";
 
 /// Trapezoidal integration of a linear circuit, started from rest (capacitors 0 V, inductors 0 A, sources
@@ -28,6 +29,10 @@ pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, S
         return Err(SimError::Singular("transient run would need more than 10 million steps; use a larger step".into()));
     }
     let steps = (stop / step + 1e-9).floor() as usize;
+    // Bounds stored f64s (node voltages + one current per part), ~400 MB at the cap.
+    if steps as f64 * (c.node_count() + c.parts.len()) as f64 > MAX_VALUES {
+        return Err(SimError::Singular("transient result would be too large; use a larger step or a shorter run".into()));
+    }
 
     let mut rest = c.clone();
     for p in &mut rest.parts {
