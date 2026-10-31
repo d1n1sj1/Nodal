@@ -1,5 +1,5 @@
-use crate::dc::dc_op;
-use crate::mna::Stamper;
+use crate::dc::{dc_op, validate};
+use crate::mna::{junctions, newton, Junction, Stamper, MAX_NEWTON_ITERS};
 use crate::{Circuit, NodeId, Part, PartKind::*, SimError};
 use std::collections::HashMap;
 
@@ -13,40 +13,80 @@ pub struct TransientResult {
     pub part_currents: HashMap<String, Vec<f64>>,
 }
 
+/// Circuit state at one instant, enough to continue a run: node voltages plus every part's current
+/// (capacitor/inductor history comes from these).
+#[derive(Debug, Clone)]
+pub struct TransientState {
+    pub node_voltages: Vec<f64>,
+    pub part_currents: HashMap<String, f64>,
+}
+
+impl TransientResult {
+    /// State at the last time point, for `transient_from`.
+    pub fn final_state(&self) -> TransientState {
+        TransientState {
+            node_voltages: self.node_voltages.last().cloned().unwrap_or_default(),
+            part_currents: self.part_currents.iter().map(|(k, v)| (k.clone(), *v.last().unwrap())).collect(),
+        }
+    }
+}
+
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
 const MAX_STEPS: f64 = 1e7;
 const MAX_VALUES: f64 = 5e7;
 const CAUSE: &str = "transient matrix is singular: voltage sources in a loop or a source across a zero-ohm path";
 
-/// Trapezoidal integration of a linear circuit, started from rest (capacitors 0 V, inductors 0 A, sources
-/// switch on at t = 0). Rest state is solved with dc_op on a copy where C is a 0 V source and L a 0 A source.
-/// Diodes/LEDs are skipped until Task 5. The matrix is factored once and reused for every step.
+/// Trapezoidal integration, started from rest (capacitors 0 V, inductors 0 A, sources switch on at t = 0).
+/// Rest state is solved with dc_op on a copy where C is a 0 V source and L a 0 A source.
+/// Linear circuits factor the matrix once; circuits with diodes/LEDs run Newton at every step.
 pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, SimError> {
-    if !(step.is_finite() && step > 0.0 && stop.is_finite() && stop > 0.0) {
-        return Err(SimError::Singular("transient stop time and step must be finite and above zero".into()));
-    }
-    if stop / step > MAX_STEPS {
-        return Err(SimError::Singular("transient run would need more than 10 million steps; use a larger step".into()));
-    }
-    let steps = (stop / step + 1e-9).floor() as usize;
-    // Bounds stored f64s (node voltages + one current per part), ~400 MB at the cap.
-    if steps as f64 * (c.node_count() + c.parts.len()) as f64 > MAX_VALUES {
-        return Err(SimError::Singular("transient result would be too large; use a larger step or a shorter run".into()));
-    }
-
+    check_run(c, stop, step)?;
     let mut rest = c.clone();
     for p in &mut rest.parts {
         match p.kind {
-            Capacitor { farads: x, .. } | Inductor { henries: x, .. } if !(x.is_finite() && x > 0.0) => {
-                return Err(SimError::Singular(format!("part {} has an invalid value (must be finite and above zero)", p.id)));
-            }
             Capacitor { a, b, .. } => p.kind = VSource { pos: a, neg: b, volts: 0.0 },
             Inductor { a, b, .. } => p.kind = ISource { from: a, to: b, amps: 0.0 },
             _ => {}
         }
     }
     let dc = dc_op(&rest)?;
+    run(c, TransientState { node_voltages: dc.node_voltages, part_currents: dc.part_currents }, stop, step)
+}
 
+/// Like `transient`, but starts from `initial` (e.g. another run's `final_state()`) instead of rest.
+/// The circuit may differ from the one that produced `initial` in values, not in topology or part ids.
+pub fn transient_from(c: &Circuit, initial: &TransientState, stop: f64, step: f64) -> Result<TransientResult, SimError> {
+    validate(c)?;
+    check_run(c, stop, step)?;
+    if initial.node_voltages.len() != c.node_count() || c.parts.iter().any(|p| !initial.part_currents.contains_key(&p.id)) {
+        return Err(SimError::Singular("initial state does not match the circuit's nodes and parts".into()));
+    }
+    run(c, initial.clone(), stop, step)
+}
+
+fn check_run(c: &Circuit, stop: f64, step: f64) -> Result<(), SimError> {
+    if !(step.is_finite() && step > 0.0 && stop.is_finite() && stop > 0.0) {
+        return Err(SimError::Singular("transient stop time and step must be finite and above zero".into()));
+    }
+    if stop / step > MAX_STEPS {
+        return Err(SimError::Singular("transient run would need more than 10 million steps; use a larger step".into()));
+    }
+    // Bounds stored f64s (node voltages + one current per part), ~400 MB at the cap.
+    if (stop / step + 1e-9).floor() * (c.node_count() + c.parts.len()) as f64 > MAX_VALUES {
+        return Err(SimError::Singular("transient result would be too large; use a larger step or a shorter run".into()));
+    }
+    for p in &c.parts {
+        if let Capacitor { farads: x, .. } | Inductor { henries: x, .. } = p.kind {
+            if !(x.is_finite() && x > 0.0) {
+                return Err(SimError::Singular(format!("part {} has an invalid value (must be finite and above zero)", p.id)));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<TransientResult, SimError> {
+    let steps = (stop / step + 1e-9).floor() as usize;
     let n = c.node_count();
     let mut branch_of = HashMap::new();
     for p in &c.parts {
@@ -71,22 +111,24 @@ pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, S
                 s.voltage_source(k, a.0, b.0, 0.0);
                 s.branch_resistance(k, 2.0 * henries / step);
             }
-            Diode { .. } | Led { .. } => {}
+            Diode { .. } | Led { .. } => {} // stamped per Newton iteration
         }
     }
     let base = s.rhs.clone();
-    let f = s.factor(CAUSE)?;
+    let js = junctions(c);
+    // Linear fast path: factor once. Nonlinear: newton re-stamps from a clone of `s` every iteration.
+    let fast = if js.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
 
     // Per-part history: current through and voltage across (a - b) at the previous point.
-    let mut ist: Vec<f64> = c.parts.iter().map(|p| dc.part_currents[&p.id]).collect();
+    let mut ist: Vec<f64> = c.parts.iter().map(|p| init.part_currents[&p.id]).collect();
     let mut vst: Vec<f64> = c.parts.iter().map(|p| match p.kind {
-        Capacitor { a, b, .. } | Inductor { a, b, .. } => vd(&dc.node_voltages, a, b),
+        Capacitor { a, b, .. } | Inductor { a, b, .. } => vd(&init.node_voltages, a, b),
         _ => 0.0,
     }).collect();
 
     let mut times = vec![0.0];
-    let mut part_currents: HashMap<String, Vec<f64>> = c.parts.iter().map(|p| (p.id.clone(), vec![dc.part_currents[&p.id]])).collect();
-    let mut node_voltages = vec![dc.node_voltages];
+    let mut part_currents: HashMap<String, Vec<f64>> = c.parts.iter().map(|p| (p.id.clone(), vec![init.part_currents[&p.id]])).collect();
+    let mut node_voltages = vec![init.node_voltages];
 
     for k in 1..=steps {
         let mut rhs = base.clone();
@@ -101,7 +143,14 @@ pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, S
                 _ => {}
             }
         }
-        let x = f.solve(&rhs);
+        let x = match &fast {
+            Some(f) => f.solve(&rhs),
+            None => {
+                let mut st = s.clone();
+                st.rhs = rhs;
+                newton(&st, &js, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
+            }
+        };
         let mut v = vec![0.0; n];
         v[1..].copy_from_slice(&x[..n - 1]);
         for (i, p) in c.parts.iter().enumerate() {
@@ -117,7 +166,7 @@ pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, S
                     vst[i] = vn;
                     cur
                 }
-                Diode { .. } | Led { .. } => 0.0,
+                Diode { .. } | Led { .. } => Junction::of(p).unwrap().current(&v),
             };
             ist[i] = cur;
             part_currents.get_mut(&p.id).unwrap().push(cur);

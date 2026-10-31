@@ -1,4 +1,4 @@
-use crate::mna::Stamper;
+use crate::mna::{junctions, newton, Junction, Stamper, MAX_NEWTON_ITERS};
 use crate::{Circuit, PartKind::*, SimError};
 use std::collections::HashMap;
 
@@ -6,13 +6,14 @@ use std::collections::HashMap;
 pub struct DcResult {
     /// index = NodeId.0, [0] = 0.0
     pub node_voltages: Vec<f64>,
-    /// by part id. Resistor/inductor/switch: a->b. VSource: pos->neg through the source. ISource: from->to.
+    /// by part id. Resistor/inductor/switch: a->b. VSource: pos->neg through the source. ISource: from->to. Diode/LED: anode->cathode.
     pub part_currents: HashMap<String, f64>,
 }
 
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
 
-pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
+/// Rejects an empty circuit and non-finite / non-positive part values.
+pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
     if c.parts.is_empty() {
         return Err(SimError::EmptyCircuit);
     }
@@ -26,6 +27,12 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
             return Err(SimError::Singular(format!("part {} has an invalid value (must be finite, and resistance above zero)", p.id)));
         }
     }
+    Ok(())
+}
+
+/// DC operating point. Diodes/LEDs are solved by Newton iteration (see `mna::newton`); a linear circuit is one solve.
+pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
+    validate(c)?;
     let n = c.node_count();
     let mut pins = vec![0u32; n];
     for p in &c.parts {
@@ -38,14 +45,14 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
         return Err(SimError::FloatingNode(i as u32));
     }
 
-    // Every node needs a DC path to ground (capacitors, diodes, LEDs, current sources and open switches carry none).
+    // Every node needs a DC path to ground (capacitors, current sources and open switches carry none; diodes/LEDs count via gmin).
     let mut uf: Vec<usize> = (0..n).collect();
     fn find(uf: &mut [usize], mut x: usize) -> usize {
         while uf[x] != x { uf[x] = uf[uf[x]]; x = uf[x]; }
         x
     }
     for p in &c.parts {
-        if matches!(p.kind, Resistor { .. } | Inductor { .. } | VSource { .. } | Switch { closed: true, .. }) {
+        if matches!(p.kind, Resistor { .. } | Inductor { .. } | VSource { .. } | Diode { .. } | Led { .. } | Switch { closed: true, .. }) {
             let [x, y] = p.nodes();
             let (rx, ry) = (find(&mut uf, x as usize), find(&mut uf, y as usize));
             uf[rx] = ry;
@@ -72,10 +79,12 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
             VSource { pos, neg, volts } => s.voltage_source(k.unwrap(), pos.0, neg.0, volts),
             Inductor { a, b, .. } | Switch { a, b, closed: true } => s.voltage_source(k.unwrap(), a.0, b.0, 0.0),
             Switch { a, b, closed: false } => s.conductance(a.0, b.0, OPEN_SWITCH_SIEMENS),
-            Capacitor { .. } | Diode { .. } | Led { .. } => {} // open in DC / nonlinear parts arrive in Task 5
+            Capacitor { .. } | Diode { .. } | Led { .. } => {} // open in DC / junctions stamped by newton
         }
     }
-    let x = s.solve("voltage sources in a loop or a source across a zero-ohm path")?;
+    let cause = "voltage sources in a loop or a source across a zero-ohm path";
+    let js = junctions(c);
+    let x = if js.is_empty() { s.solve(cause)? } else { newton(&s, &js, &vec![0.0; n], MAX_NEWTON_ITERS, cause)? };
 
     let mut node_voltages = vec![0.0; n];
     node_voltages[1..].copy_from_slice(&x[..n - 1]);
@@ -87,7 +96,8 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
             ISource { amps, .. } => amps,
             Switch { a, b, closed: false } => (v(a) - v(b)) * OPEN_SWITCH_SIEMENS,
             VSource { .. } | Inductor { .. } | Switch { .. } => x[n - 1 + branch_of[p.id.as_str()]],
-            Capacitor { .. } | Diode { .. } | Led { .. } => 0.0,
+            Diode { .. } | Led { .. } => Junction::of(p).unwrap().current(&node_voltages),
+            Capacitor { .. } => 0.0,
         };
         part_currents.insert(p.id.clone(), i);
     }
