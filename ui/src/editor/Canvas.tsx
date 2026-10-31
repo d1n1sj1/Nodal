@@ -37,7 +37,7 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
     setWiring(null)
   }
 
-  const onPin = (e: MouseEvent, pin: Pin) => {
+  const onPin = (e: { stopPropagation: () => void }, pin: Pin) => {
     e.stopPropagation()
     if (!wiring) return setWiring(pin)
     onChange(addWire(schematic, wiring, pin))
@@ -45,6 +45,15 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
   }
 
   const onKeyDown = (e: React.KeyboardEvent) => {
+    if ((e.key === 'Enter' || e.key === ' ') && placing && e.target === e.currentTarget) {
+      e.preventDefault()
+      const taken = (x: number, y: number) => schematic.parts.some((p) => p.pos.x === x && p.pos.y === y)
+      let k = 0 // next free cell in a 6-wide layout
+      while (taken(100 + (k % 6) * 140, 100 + Math.floor(k / 6) * 100)) k++
+      onChange(addPart(schematic, placing, { x: 100 + (k % 6) * 140, y: 100 + Math.floor(k / 6) * 100 }))
+      onPlaced?.()
+      return
+    }
     if ((e.key !== 'Delete' && e.key !== 'Backspace') || !selected) return
     const [type, id] = selected.split(':')
     onChange(type === 'part' ? removePart(schematic, id) : removeWire(schematic, Number(id)))
@@ -90,7 +99,7 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
         const tile = kids ? tileFor(p.def) : null
         const Icon = tile ? tile.picture : p.def.symbol
         return (
-          <g key={p.id} data-part-id={p.id} role="button" aria-label={tile ? tile.name : p.def.name}
+          <g key={p.id} data-part-id={p.id} role="group" aria-label={`${tile ? tile.name : p.def.name} ${p.id}`}
             className={`placed ${selected === `part:${p.id}` ? 'selected' : ''}`} transform={`translate(${p.pos.x} ${p.pos.y})`}
             onMouseDown={(e) => {
               e.stopPropagation()
@@ -100,6 +109,8 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
             }}
             onClick={(e) => e.stopPropagation()}
           >
+            <g role="button" tabIndex={0} aria-label={`Select ${tile ? tile.name : p.def.name} ${p.id}`}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSelected(`part:${p.id}`) } }}>
             {tile ? (
               <>
                 <rect x={-PART_HALF_WIDTH} y="-22" width={PART_HALF_WIDTH * 2} height="44" rx="10" fill={tile.color} />
@@ -108,14 +119,16 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced }:
             ) : (
               <g transform="translate(-34 -18) scale(2)"><Icon /></g>
             )}
+            </g>
             <text y="36" textAnchor="middle" className="part-label">{tile ? tile.name : p.def.name}</text>
             {Array.from({ length: pinCount(p) }, (_, i) => {
               const c = pinPos(p, i)
               const active = wiring?.part === p.id && wiring.pin === i
               return (
-                <circle key={i} role="button" aria-label={`${p.id} pin ${i + 1}`} className={`pin ${active ? 'active' : ''}`}
+                <circle key={i} role="button" tabIndex={0} aria-label={`${p.id} pin ${i + 1}`} className={`pin ${active ? 'active' : ''}`}
                   cx={c.x - p.pos.x} cy={c.y - p.pos.y} r="5"
-                  onMouseDown={(e) => e.stopPropagation()} onClick={(e) => onPin(e, { part: p.id, pin: i })} />
+                  onMouseDown={(e) => e.stopPropagation()} onClick={(e) => onPin(e, { part: p.id, pin: i })}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPin(e, { part: p.id, pin: i }) } }} />
               )
             })}
           </g>

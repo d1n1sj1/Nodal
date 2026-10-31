@@ -79,3 +79,4 @@ body { margin: 0; }
 .canvas .pin.active { fill: var(--accent); }
 .app-error { margin: 0; padding: 8px 12px; color: #b91c1c; }
 .file-actions { display: flex; gap: 6px; margin-left: auto; margin-right: 12px; }
+.canvas :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

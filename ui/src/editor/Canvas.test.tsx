@@ -19,9 +19,12 @@ test('delete_removes_the_selected_part', () => {
   const onChange = vi.fn()
   const s = addPart(emptySchematic(), 'Resistor', { x: 100, y: 100 })
   render(<Canvas schematic={s} onChange={onChange} mode="kids" />)
-  expect(screen.getByRole('button', { name: 'Resistor' })).toBeTruthy() // kids tile name
-  fireEvent.mouseDown(screen.getByRole('button', { name: 'Resistor' }))
-  fireEvent.keyDown(screen.getByRole('application'), { key: 'Delete' })
+  const body = screen.getByRole('button', { name: 'Select Resistor p1' }) // kids tile name
+  fireEvent.keyDown(body, { key: 'Enter' })
+  const svg = screen.getByRole('application')
+  svg.focus()
+  expect(document.activeElement).toBe(svg)
+  fireEvent.keyDown(svg, { key: 'Delete' })
   expect(onChange.mock.calls[0][0].parts).toHaveLength(0)
 })
 
@@ -35,4 +38,24 @@ test('clicking_two_pins_adds_a_wire', () => {
   rerender(<Canvas schematic={s} onChange={onChange} mode="engineer" />)
   expect(s.wires).toHaveLength(1)
   expect(document.querySelectorAll('line.wire')).toHaveLength(1)
+})
+
+test('keyboard_wires_two_pins', () => {
+  const onChange = vi.fn()
+  const s = addPart(addPart(emptySchematic(), 'Resistor', { x: 100, y: 100 }), 'Resistor', { x: 300, y: 100 })
+  render(<Canvas schematic={s} onChange={onChange} mode="engineer" />)
+  const a = screen.getByRole('button', { name: 'p1 pin 2' })
+  a.focus()
+  expect(document.activeElement).toBe(a)
+  fireEvent.keyDown(a, { key: 'Enter' })
+  fireEvent.keyDown(screen.getByRole('button', { name: 'p2 pin 1' }), { key: ' ' })
+  expect(onChange.mock.calls[0][0].wires).toHaveLength(1)
+})
+
+test('keyboard_places_armed_part_in_next_free_cell', () => {
+  const onChange = vi.fn()
+  const s = addPart(emptySchematic(), 'Resistor', { x: 100, y: 100 })
+  render(<Canvas schematic={s} onChange={onChange} mode="engineer" placing={partDefs[0]} />)
+  fireEvent.keyDown(screen.getByRole('application'), { key: 'Enter' })
+  expect(onChange.mock.calls[0][0].parts[1].pos).toEqual({ x: 240, y: 100 })
 })
