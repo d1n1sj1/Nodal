@@ -16,12 +16,18 @@ interface Props {
   onPlaced?: () => void
   /** Placed-part ids with damage warnings: drawn red. */
   damaged?: Set<string>
+  /** Selected placed-part id (null when nothing or a wire is selected), for the properties panel. */
+  onSelect?: (partId: string | null) => void
 }
 
-export default function Canvas({ schematic, onChange, mode, placing, onPlaced, damaged }: Props) {
+export default function Canvas({ schematic, onChange, mode, placing, onPlaced, damaged, onSelect }: Props) {
   const svg = useRef<SVGSVGElement>(null)
   const drag = useRef<{ id: string; dx: number; dy: number } | null>(null)
-  const [selected, setSelected] = useState<string | null>(null) // "part:<id>" | "wire:<index>"
+  const [selected, setSelectedState] = useState<string | null>(null) // "part:<id>" | "wire:<index>"
+  const setSelected = (sel: string | null) => {
+    setSelectedState(sel)
+    onSelect?.(sel?.startsWith('part:') ? sel.slice(5) : null)
+  }
   const [wiring, setWiring] = useState<Pin | null>(null)
 
   const at = (e: MouseEvent): Pos => {

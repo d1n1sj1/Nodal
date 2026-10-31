@@ -21,14 +21,9 @@ const samePin = (a: Pin, b: Pin) => a.part === b.part && a.pin === b.pin
 export function addPart(s: Schematic, what: string | PartDef, pos: Pos): Schematic {
   const def = typeof what === 'string' ? partDefs.find((d) => d.kind === what) : what
   if (!def) throw new Error(`unknown part kind: ${String(what)}`)
-  const ids = new Set(s.parts.map((p) => p.id))
-  let n = 1
-  while (ids.has(`p${n}`)) n++
+  let n = 1 // skip pN-* too: a reloaded kids motor is p1-resistor / p1-inductor, and a new p1 motor would repeat them
+  while (s.parts.some((p) => p.id === `p${n}` || p.id.startsWith(`p${n}-`))) n++
   return { ...s, parts: [...s.parts, { id: `p${n}`, def, values: { ...def.defaults }, pos }] }
-}
-
-export function addPlaced(s: Schematic, part: PlacedPart): Schematic {
-  return { ...s, parts: [...s.parts, part] }
 }
 
 export function addWire(s: Schematic, from: Pin, to: Pin): Schematic {
@@ -48,4 +43,9 @@ export const removeWire = (s: Schematic, index: number): Schematic => ({ ...s, w
 export const movePart = (s: Schematic, id: string, pos: Pos): Schematic => ({
   ...s,
   parts: s.parts.map((p) => (p.id === id ? { ...p, pos } : p)),
+})
+
+export const updateValues = (s: Schematic, id: string, values: Record<string, number>): Schematic => ({
+  ...s,
+  parts: s.parts.map((p) => (p.id === id ? { ...p, values: { ...p.values, ...values } } : p)),
 })

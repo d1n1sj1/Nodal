@@ -2,6 +2,7 @@
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, expect, test } from 'vitest'
 import { formatSI } from './formatSI'
+import Readouts from './Readouts'
 import Scope from './Scope'
 import type { SimOutput } from '../sim/api'
 
@@ -51,4 +52,10 @@ test.each([
   const { container } = render(<Scope output={out} selectedNode={1} />)
   expect(container.querySelector('svg')).toBeTruthy()
   expect(container.innerHTML).not.toMatch(/NaN|Infinity/)
+})
+
+test('readouts_show_node_label', () => {
+  const out: SimOutput = { times: [0], node_voltages: [[0, 5]], part_currents: { p1: [0.01] }, warnings: [] }
+  const { container } = render(<Readouts output={out} cursorTime={null} selectedNode={1} nodeLabel="1: Resistor p1 left" />)
+  expect(container.textContent).toContain('V (1: Resistor p1 left)')
 })

@@ -5,7 +5,8 @@ import { addWire, type Pin, type PlacedPart, type Schematic } from './schematic'
 
 /** Core files carry no layout: lay parts out on a grid and rebuild wires from shared nodes. Throws on bad input. */
 export function schematicFromCircuit(c: CircuitJson): Schematic {
-  if (!c || c.version !== 1 || !Array.isArray(c.parts)) throw new Error('This file is not a Nodal circuit.')
+  if (!c || !Array.isArray(c.parts)) throw new Error('This file is not a Nodal circuit.')
+  if (c.version !== 1) throw new Error('This file was made by a newer version of Nodal. Update Nodal to open it.')
   const parts: PlacedPart[] = []
   const byNode = new Map<number, Pin[]>()
   c.parts.forEach((jp, i) => {

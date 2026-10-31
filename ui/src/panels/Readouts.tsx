@@ -5,9 +5,9 @@ import { formatSI } from './formatSI'
 
 export { formatSI }
 
-interface Props { output: SimOutput | null; cursorTime: number | null; selectedNode: number; mode?: Mode }
+interface Props { output: SimOutput | null; cursorTime: number | null; selectedNode: number; mode?: Mode; nodeLabel?: string }
 
-export default function Readouts({ output, cursorTime, selectedNode, mode = 'engineer' }: Props) {
+export default function Readouts({ output, cursorTime, selectedNode, mode = 'engineer', nodeLabel }: Props) {
   const ids = Object.keys(output?.part_currents ?? {})
   const [part, setPart] = useState<string>('')
   const partId = ids.includes(part) ? part : ids[0]
@@ -31,7 +31,7 @@ export default function Readouts({ output, cursorTime, selectedNode, mode = 'eng
   }
   return (
     <div className="readouts">
-      <div>V (node {selectedNode}) <b>{formatSI(v, 'V')}</b></div>
+      <div>V ({nodeLabel ?? `node ${selectedNode}`}) <b>{formatSI(v, 'V')}</b></div>
       <div>
         I{' '}
         <select aria-label="Part" value={partId ?? ''} onChange={(e) => setPart(e.target.value)}>

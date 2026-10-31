@@ -10,7 +10,8 @@ export const PIN_FIELDS: Record<PartKindName, [string, string]> = {
 
 export const pinKey = (p: Pin) => `${p.part}:${p.pin}`
 
-export function buildCircuit(s: Schematic): CircuitJson {
+/** Shared by buildCircuit and nodeLabels so node numbers always agree. `pins` maps every pin/mid key nodeOf saw to its node. */
+function solve(s: Schematic): { parts: PartJson[]; pins: Map<string, number> } {
   const parent = new Map<string, string>()
   const find = (k: string): string => {
     if (!parent.has(k)) parent.set(k, k)
@@ -22,28 +23,51 @@ export function buildCircuit(s: Schematic): CircuitJson {
   const union = (a: string, b: string) => parent.set(find(a), find(b))
 
   for (const w of s.wires) union(pinKey(w.from), pinKey(w.to))
-  for (const p of s.parts) if (p.def.kind === 'Ground') for (let i = 0; i < pinCount(p); i++) union(pinKey({ part: p.id, pin: i }), 'GND')
+  const grounds = s.parts.filter((p) => p.def.kind === 'Ground')
+  for (const p of grounds) for (let i = 0; i < pinCount(p); i++) union(pinKey({ part: p.id, pin: i }), 'GND')
+  // Kids mode has no Ground tile: without a reference the core reports NoGround, so ground the first source's negative pin.
+  const src = grounds.length ? undefined : s.parts.find((p) => p.def.kind === 'VSource') ?? s.parts.find((p) => p.def.kind === 'ISource')
+  if (src) union(pinKey({ part: src.id, pin: 1 }), 'GND')
 
   const ids = new Map<string, number>([[find('GND'), 0]])
+  const pins = new Map<string, number>()
   const nodeOf = (key: string) => {
     const r = find(key) // an unwired pin is its own set, so it gets a fresh node (core reports FloatingNode)
     if (!ids.has(r)) ids.set(r, ids.size)
+    pins.set(key, ids.get(r)!)
     return ids.get(r)!
   }
 
   const parts: PartJson[] = []
   for (const p of s.parts) {
     if (p.def.kind === 'Ground') continue
-    const builds = p.def.builds ?? [{ kind: p.def.kind, defaults: p.values }]
+    // single-build kids parts honour edited values; multi-build parts (motor) keep their builds defaults
+    const builds = p.def.builds && p.def.builds.length > 1 ? p.def.builds : [{ kind: (p.def.builds?.[0].kind ?? p.def.kind) as PartKindName, defaults: p.values }]
     // Series chain: pin0 - build0 - mid1 - build1 - ... - pin1
     const chain = [`${p.id}:0`, ...builds.slice(1).map((_, i) => `${p.id}:mid${i + 1}`), `${p.id}:1`]
     builds.forEach((b, i) => {
       const [fa, fb] = PIN_FIELDS[b.kind]
       const vals: Record<string, number | boolean> = { ...b.defaults }
       if (b.kind === 'Switch') vals.closed = vals.closed !== 0
-      const id = p.def.builds && builds.length > 1 ? `${p.id}-${b.kind.toLowerCase()}` : p.id
+      const id = builds.length > 1 ? `${p.id}-${b.kind.toLowerCase()}` : p.id
       parts.push({ id, kind: b.kind, [fa]: nodeOf(chain[i]), [fb]: nodeOf(chain[i + 1]), ...vals } as PartJson)
     })
   }
-  return { version: 1, parts }
+  return { parts, pins }
+}
+
+export const buildCircuit = (s: Schematic): CircuitJson => ({ version: 1, parts: solve(s).parts })
+
+const SIDE: Record<string, string> = { 0: 'left', 1: 'right' }
+
+/** One label per core node, e.g. "2: Resistor p2 right, Resistor p3 left"; node 0 is "0: ground". */
+export function nodeLabels(s: Schematic): string[] {
+  const names: string[][] = []
+  for (const [key, n] of solve(s).pins) {
+    const cut = key.lastIndexOf(':') // loaded ids may contain ':'
+    const [id, pin] = [key.slice(0, cut), key.slice(cut + 1)]
+    const p = s.parts.find((x) => x.id === id)!
+    ;(names[n] ??= []).push(`${p.def.name} ${id} ${SIDE[pin] ?? 'inside'}`)
+  }
+  return Array.from({ length: names.length || 1 }, (_, n) => (n === 0 ? '0: ground' : `${n}: ${names[n].join(', ')}`))
 }

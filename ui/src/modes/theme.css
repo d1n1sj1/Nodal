@@ -90,6 +90,11 @@ body { margin: 0; }
 .run-btn { border: 0; border-radius: var(--radius); padding: 6px 18px; font: inherit; font-weight: 600; background: var(--accent2); color: #0f1115; cursor: pointer; }
 .run-btn:disabled { opacity: 0.5; cursor: default; }
 .runbar-error { color: #b91c1c; }
+.properties { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 8px 12px; background: var(--panel); border-top: 1px solid var(--border); }
+.properties h2 { margin: 0; font-size: 1em; }
+.properties input { font: inherit; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; }
+.properties input[aria-invalid] { border-color: #b91c1c; }
+.prop-error { margin-left: 6px; color: #b91c1c; }
 .results { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; padding: 12px; background: var(--panel); border-top: 1px solid var(--border); }
 .scope { width: 480px; max-width: 100%; background: var(--bg); border-radius: var(--radius); }
 .scope-frame { fill: none; stroke: var(--border); }

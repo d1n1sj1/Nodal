@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { buildCircuit } from '../editor/buildCircuit'
-import type { Schematic } from '../editor/schematic'
+import { buildCircuit, pinKey } from '../editor/buildCircuit'
+import { pinCount, type Schematic } from '../editor/schematic'
 import type { Mode } from '../modes/mode'
+import { tileFor } from '../parts/tiles'
 import { runSimulation, type SimOutput } from '../sim/api'
 import { parseSI } from './formatSI'
 
@@ -25,6 +26,11 @@ export default function RunBar({ schematic, onResult, mode = 'engineer' }: Props
     if (stopS / stepS > MAX_STEPS) return setError('That would need too many steps: try a shorter time or a bigger step.')
     const circuit = buildCircuit(schematic)
     if (circuit.parts.length === 0) return setError('Nothing to simulate yet: add some parts first.')
+    const wired = new Set(schematic.wires.flatMap((w) => [pinKey(w.from), pinKey(w.to)]))
+    const loose = schematic.parts.find((p) => p.def.kind !== 'Ground' && Array.from({ length: pinCount(p) }, (_, i) => pinKey({ part: p.id, pin: i })).some((k) => !wired.has(k)))
+    if (loose) {
+      return setError(mode === 'kids' ? `The ${tileFor(loose.def).name} has a loose end — connect both sides!` : `Connect both ends of ${loose.def.name} (${loose.id}) before running.`)
+    }
     const id = ++latest.current
     setError(null)
     setRunning(true)

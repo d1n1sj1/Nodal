@@ -3,11 +3,12 @@ import { open, save } from '@tauri-apps/plugin-dialog'
 import Palette from './panels/Palette'
 import Logo from './brand/Logo'
 import Canvas from './editor/Canvas'
-import { buildCircuit } from './editor/buildCircuit'
+import { buildCircuit, nodeLabels } from './editor/buildCircuit'
 import { schematicFromCircuit } from './editor/fromCircuit'
-import { emptySchematic, type Schematic } from './editor/schematic'
+import { emptySchematic, updateValues, type Schematic } from './editor/schematic'
 import { useMode, type Mode } from './modes/mode'
 import type { PartDef } from './parts/registry'
+import Properties from './panels/Properties'
 import RunBar from './panels/RunBar'
 import Scope from './panels/Scope'
 import Readouts from './panels/Readouts'
@@ -27,6 +28,9 @@ function App() {
   const [result, setResult] = useState<SimOutput | null>(null)
   const [node, setNode] = useState<number | null>(null)
   const [cursor, setCursor] = useState<number | null>(null)
+  const [partId, setPartId] = useState<string | null>(null)
+  const part = schematic.parts.find((p) => p.id === partId)
+  const labels = nodeLabels(schematic)
   const nodes = result?.node_voltages[0]?.length ?? 0
   const selected = node !== null && node < nodes ? node : Math.max(0, nodes - 1)
   const modes: [Mode, string][] = [['engineer', 'Engineer'], ['kids', 'Kids']]
@@ -73,18 +77,19 @@ function App() {
         <Palette mode={mode} onPick={setPlacing} />
         <main className="app-main">
           {error && <p className="app-error" role="alert">{error}</p>}
-          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} damaged={damagedIds(result?.warnings)} />
+          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} damaged={damagedIds(result?.warnings, schematic)} onSelect={setPartId} />
+          {part && <Properties key={part.id} part={part} mode={mode} onChange={(v) => setSchematic((s) => updateValues(s, part.id, v))} />}
           <WarningBanner warnings={result?.warnings} mode={mode} schematic={schematic} />
           <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
           {result && (
             <section className="results">
               <label>Node{' '}
                 <select aria-label="Node" value={selected} onChange={(e) => setNode(Number(e.target.value))}>
-                  {Array.from({ length: nodes }, (_, i) => <option key={i} value={i}>{i}</option>)}
+                  {Array.from({ length: nodes }, (_, i) => <option key={i} value={i}>{labels[i] ?? i}</option>)}
                 </select>
               </label>
               <Scope output={result} selectedNode={selected} onCursor={setCursor} />
-              <Readouts output={result} cursorTime={cursor} selectedNode={selected} mode={mode} />
+              <Readouts output={result} cursorTime={cursor} selectedNode={selected} mode={mode} nodeLabel={labels[selected]} />
             </section>
           )}
         </main>

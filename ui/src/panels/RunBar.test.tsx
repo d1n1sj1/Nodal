@@ -2,7 +2,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import RunBar from './RunBar'
-import { addPart, emptySchematic } from '../editor/schematic'
+import { addPart, addWire, emptySchematic } from '../editor/schematic'
+import { kidsPalette } from '../parts/registry'
 
 // Plain wrapper, not a rejecting vi.fn: vitest 5 fails the test on a mock that returns a rejected promise.
 const impl = vi.hoisted(() => ({ fn: (..._a: unknown[]): Promise<unknown> => Promise.resolve() }))
@@ -12,7 +13,8 @@ vi.mock('../sim/api', () => ({ runSimulation }))
 beforeEach(() => { runSimulation.mockClear(); impl.fn = () => Promise.resolve() })
 afterEach(cleanup)
 
-const withPart = () => addPart(emptySchematic(), 'Resistor', { x: 0, y: 0 })
+const loose = () => addPart(emptySchematic(), 'Resistor', { x: 0, y: 0 })
+const withPart = () => addWire(loose(), { part: 'p1', pin: 0 }, { part: 'p1', pin: 1 }) // both ends wired
 
 test('run_on_empty_schematic_shows_nothing_to_simulate_message_and_does_not_call_backend', () => {
   render(<RunBar schematic={emptySchematic()} onResult={vi.fn()} mode="engineer" />)
@@ -67,5 +69,22 @@ test.each([['1e999', '10u'], ['10m', '1e999'], ['1', '1p']])('bad_bounds_%s_%s_s
   fireEvent.change(screen.getByLabelText('Step'), { target: { value: step } })
   fireEvent.click(screen.getByRole('button', { name: 'Run' }))
   expect(screen.getByRole('alert')).toBeTruthy()
+  expect(runSimulation).not.toHaveBeenCalled()
+})
+
+test('unwired_resistor_shows_connect_message_and_does_not_call_backend', () => {
+  render(<RunBar schematic={loose()} onResult={vi.fn()} mode="engineer" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+  expect(screen.getByRole('alert').textContent).toBe('Connect both ends of Resistor (p1) before running.')
+  expect(runSimulation).not.toHaveBeenCalled()
+})
+
+test('kids_loose_end_message_names_the_tile', () => {
+  const bulb = kidsPalette().find((d) => d.id === 'kids-bulb')!
+  let s = addPart(addPart(emptySchematic(), 'Ground', { x: 0, y: 0 }), bulb, { x: 0, y: 0 }) // unwired Ground is fine
+  s = addWire(s, { part: 'p2', pin: 0 }, { part: 'p1', pin: 0 })
+  render(<RunBar schematic={s} onResult={vi.fn()} mode="kids" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+  expect(screen.getByRole('alert').textContent).toBe('The Bulb has a loose end — connect both sides!')
   expect(runSimulation).not.toHaveBeenCalled()
 })
