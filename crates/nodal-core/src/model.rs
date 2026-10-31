@@ -58,7 +58,7 @@ impl Circuit {
 }
 
 impl Part {
-    fn nodes(&self) -> [u32; 2] {
+    pub(crate) fn nodes(&self) -> [u32; 2] {
         use PartKind::*;
         let (x, y) = match &self.kind {
             Resistor { a, b, .. } | Capacitor { a, b, .. } | Inductor { a, b, .. } | Switch { a, b, .. } => (a, b),
