@@ -51,7 +51,12 @@ impl Circuit {
                     return Err(SimError::UnknownPartKind(k.to_string()));
                 }
             }
-            parts.push(serde_json::from_value(p.clone()).map_err(|e| SimError::BadFile(e.to_string()))?);
+            let part: Part = serde_json::from_value(p.clone()).map_err(|e| SimError::BadFile(e.to_string()))?;
+            // solvers key branch rows by id; a repeat would index past the matrix
+            if parts.iter().any(|q: &Part| q.id == part.id) {
+                return Err(SimError::BadFile(format!("duplicate part id \"{}\"", part.id)));
+            }
+            parts.push(part);
         }
         Ok(Circuit { parts })
     }

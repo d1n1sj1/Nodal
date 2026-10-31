@@ -36,3 +36,11 @@ fn unknown_part_kind_returns_unknown_part_kind_error() {
     assert_eq!(Circuit::from_json(j), Err(SimError::UnknownPartKind("Transistor".into())));
     assert!(matches!(Circuit::from_json("{nope"), Err(SimError::BadFile(_))));
 }
+
+#[test]
+fn duplicate_part_id_is_bad_file() {
+    let j = r#"{"version":1,"parts":[
+     {"id":"V1","kind":"VSource","pos":1,"neg":0,"volts":5.0},
+     {"id":"V1","kind":"VSource","pos":2,"neg":0,"volts":3.0}]}"#;
+    assert_eq!(Circuit::from_json(j), Err(SimError::BadFile("duplicate part id \"V1\"".into())));
+}

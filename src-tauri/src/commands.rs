@@ -38,18 +38,19 @@ pub fn load_circuit_impl(path: &str) -> Result<String, String> {
     Ok(s)
 }
 
-#[tauri::command]
+/// `async` runs commands on the threadpool: heavy runs stay off the main thread and a panic cannot abort the app.
+#[tauri::command(async)]
 pub fn run_simulation(circuit_json: String, stop: f64, step: f64) -> Result<SimOutput, String> {
     run_simulation_impl(&circuit_json, stop, step)
 }
 
 /// `path` always comes from the native dialog plugin (the UI never builds paths itself).
-#[tauri::command]
+#[tauri::command(async)]
 pub fn save_circuit(path: String, circuit_json: String) -> Result<(), String> {
     save_circuit_impl(&path, &circuit_json)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn load_circuit(path: String) -> Result<String, String> {
     load_circuit_impl(&path)
 }

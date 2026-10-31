@@ -11,7 +11,10 @@
   },
   "app": {
     "windows": [{ "title": "Nodal", "width": 1200, "height": 800 }],
-    "security": { "csp": null }
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost",
+      "devCsp": null
+    }
   },
   "bundle": {
     "active": true,
