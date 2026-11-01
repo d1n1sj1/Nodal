@@ -1,7 +1,7 @@
 import { useRef, useState, type MouseEvent } from 'react'
 import type { Mode } from '../modes/mode'
 import type { PartDef } from '../parts/registry'
-import { tileFor } from '../parts/tiles'
+import { tileFor, tiles } from '../parts/tiles'
 import { addPart, addWire, movePart, pinCount, pinPos, removePart, removeWire, PART_HALF_WIDTH, PART_HALF_HEIGHT, type Pin, type Pos, type Schematic } from './schematic'
 
 const GRID = 20
@@ -18,9 +18,11 @@ interface Props {
   damaged?: Set<string>
   /** Selected placed-part id (null when nothing or a wire is selected), for the properties panel. */
   onSelect?: (partId: string | null) => void
+  /** Kids bulb brightness 0..1 by placed-part id. */
+  glow?: Map<string, number>
 }
 
-export default function Canvas({ schematic, onChange, mode, placing, onPlaced, damaged, onSelect }: Props) {
+export default function Canvas({ schematic, onChange, mode, placing, onPlaced, damaged, onSelect, glow }: Props) {
   const svg = useRef<SVGSVGElement>(null)
   const drag = useRef<{ id: string; dx: number; dy: number } | null>(null)
   const [selected, setSelectedState] = useState<string | null>(null) // "part:<id>" | "wire:<index>"
@@ -130,6 +132,9 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
             {tile ? (
               <>
                 <rect x={-PART_HALF_WIDTH} y="-22" width={PART_HALF_WIDTH * 2} height="44" rx="10" fill={tile.color} />
+                {tile === tiles.bulb && (glow?.get(p.id) ?? 0) > 0.02 && (
+                  <circle data-testid="bulb-glow" cx="0" cy="-6" r="24" fill="#fbbf24" opacity={0.25 + 0.6 * glow!.get(p.id)!} />
+                )}
                 <g transform="translate(-22 -22)"><Icon /></g>
               </>
             ) : (

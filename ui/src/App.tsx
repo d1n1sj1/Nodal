@@ -15,6 +15,7 @@ import Scope from './panels/Scope'
 import Readouts from './panels/Readouts'
 import WarningBanner from './panels/WarningBanner'
 import { damagedIds } from './panels/warningText'
+import { glowLevels } from './panels/glow'
 import { getCurrentWindow } from '@tauri-apps/api/window'
 import { loadCircuit, saveCircuit, type SimOutput } from './sim/api'
 import './modes/theme.css'
@@ -115,7 +116,7 @@ function App() {
         <Palette mode={mode} onPick={setPlacing} />
         <main className="app-main">
           {error && <p className="app-error" role="alert">{error}</p>}
-          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} damaged={damagedIds(result?.warnings, schematic)} onSelect={setPartId} />
+          <Canvas schematic={schematic} onChange={setSchematic} mode={mode} placing={placing} onPlaced={() => setPlacing(null)} damaged={damagedIds(result?.warnings, schematic)} glow={glowLevels(result, schematic)} onSelect={setPartId} />
           {part && <Properties key={part.id} part={part} mode={mode} onChange={(v) => setSchematic((s) => updateValues(s, part.id, v))} />}
           <WarningBanner warnings={result?.warnings} mode={mode} schematic={schematic} />
           <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
