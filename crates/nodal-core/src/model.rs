@@ -29,6 +29,8 @@ pub struct Circuit {
     pub parts: Vec<Part>,
 }
 
+const FILE_VERSION: u64 = 1;
+// keep in step with PartKind: tests/model.rs round-trips every kind and fails if one is missing here.
 const KINDS: [&str; 8] = ["Resistor", "Capacitor", "Inductor", "VSource", "ISource", "Diode", "Led", "Switch"];
 
 impl Circuit {
@@ -38,11 +40,14 @@ impl Circuit {
     }
 
     pub fn to_json(&self) -> String {
-        serde_json::json!({ "version": 1, "parts": self.parts }).to_string()
+        serde_json::json!({ "version": FILE_VERSION, "parts": self.parts }).to_string()
     }
 
     pub fn from_json(s: &str) -> Result<Circuit, SimError> {
         let v: serde_json::Value = serde_json::from_str(s).map_err(|e| SimError::BadFile(e.to_string()))?;
+        if let Some(ver) = v.get("version").and_then(|x| x.as_u64()).filter(|&x| x > FILE_VERSION) {
+            return Err(SimError::BadFile(format!("file version {ver} was made by a newer version of Nodal")));
+        }
         let raw = v.get("parts").and_then(|p| p.as_array()).ok_or_else(|| SimError::BadFile("missing \"parts\" list".into()))?;
         let mut parts = Vec::with_capacity(raw.len());
         for p in raw {

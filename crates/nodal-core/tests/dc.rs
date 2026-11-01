@@ -82,3 +82,47 @@ fn isolated_resistor_island_is_floating() {
     let c = Circuit { parts: vec![v("V1", 1, 5.0), r("R1", 1, 0), r("R2", 2, 3), r("R3", 3, 2)] };
     assert_eq!(dc_op(&c).unwrap_err(), SimError::FloatingNode(2));
 }
+
+fn near(a: f64, b: f64) -> bool {
+    (a - b).abs() < 1e-6
+}
+
+#[test]
+fn closed_switch_is_a_short() {
+    let s = p("S1", Switch { a: n(2), b: n(0), closed: true });
+    let d = dc_op(&Circuit { parts: vec![v("V1", 1, 10.0), r("R1", 1, 2), s] }).unwrap();
+    assert!(near(d.node_voltages[2], 0.0));
+    assert!(near(d.part_currents["S1"], 0.01));
+}
+
+#[test]
+fn open_switch_blocks_current() {
+    let s = p("S1", Switch { a: n(2), b: n(0), closed: false });
+    let d = dc_op(&Circuit { parts: vec![v("V1", 1, 10.0), r("R1", 1, 2), r("R2", 2, 0), s] }).unwrap();
+    assert!(near(d.node_voltages[2], 5.0));
+    assert!(d.part_currents["S1"].abs() < 1e-9);
+}
+
+#[test]
+fn inductor_is_a_short_at_dc() {
+    let l = p("L1", Inductor { a: n(1), b: n(2), henries: 1e-3 });
+    let d = dc_op(&Circuit { parts: vec![v("V1", 1, 10.0), l, r("R1", 2, 0)] }).unwrap();
+    assert!(near(d.node_voltages[2], 10.0));
+    assert!(near(d.part_currents["L1"], 0.01));
+}
+
+#[test]
+fn capacitor_is_open_at_dc() {
+    let cap = p("C1", Capacitor { a: n(1), b: n(2), farads: 1e-6 });
+    let d = dc_op(&Circuit { parts: vec![v("V1", 1, 10.0), cap, r("R1", 2, 0)] }).unwrap();
+    assert!(near(d.node_voltages[2], 0.0));
+    assert!(d.part_currents["C1"].abs() < 1e-9);
+}
+
+#[test]
+fn current_source_drives_a_resistor() {
+    let i = p("I1", ISource { from: n(0), to: n(1), amps: 0.01 });
+    let d = dc_op(&Circuit { parts: vec![i, r("R1", 1, 0)] }).unwrap();
+    assert!(near(d.node_voltages[1], 10.0)); // from -> to injects into node 1
+    assert!(near(d.part_currents["I1"], 0.01));
+}

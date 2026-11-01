@@ -44,3 +44,12 @@ fn duplicate_part_id_is_bad_file() {
      {"id":"V1","kind":"VSource","pos":2,"neg":0,"volts":3.0}]}"#;
     assert_eq!(Circuit::from_json(j), Err(SimError::BadFile("duplicate part id \"V1\"".into())));
 }
+
+#[test]
+fn newer_file_version_is_rejected_and_missing_version_is_accepted() {
+    let j = |v: &str| format!(r#"{{{v}"parts":[{{"id":"S1","kind":"Switch","a":1,"b":0,"closed":true}}]}}"#);
+    assert!(Circuit::from_json(&j(r#""version":1,"#)).is_ok());
+    assert!(Circuit::from_json(&j("")).is_ok());
+    let e = Circuit::from_json(&j(r#""version":2,"#)).unwrap_err();
+    assert!(matches!(&e, SimError::BadFile(m) if m.contains("version 2") && m.contains("newer")), "{e}");
+}
