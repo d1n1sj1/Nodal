@@ -29,7 +29,7 @@
     "publisher": "Nodal contributors",
     "copyright": "Copyright (c) Nodal contributors. MIT OR Apache-2.0",
     "license": "MIT OR Apache-2.0",
-    "licenseFile": "../LICENSE-MIT",
+    "licenseFile": "LICENSE.txt",
     "category": "Education",
     "shortDescription": "Open-source circuit simulator",
     "longDescription": "Nodal is an open-source circuit simulator with a fast Rust core, DC operating point and transient analysis, and Kids and Engineer modes."

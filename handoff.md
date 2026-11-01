@@ -68,7 +68,7 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 - Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API;  Newton rebuilds the sparse ordering every iteration; the oversized-result test only asserts `is_err()`.
 - App: commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
 - UI: the Kids bulb glows after a run (final-sample power over its watt rating, `panels/glow.ts`); error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
-- Release: macOS runner is arm64 only (no Intel build); `licenseFile` names only the MIT file; category "Education" unconfirmed; actions pinned by tag, not SHA.
+- Release (fixed, not yet run): macOS builds arm64 and x86_64 targets; `licenseFile` is `src-tauri/LICENSE.txt` (both licenses); actions pinned by SHA in `ci.yml` and `release.yml`. Category "Education" still unchecked against Tauri's list (a `tauri build` would reject a bad value).
 - Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.
 
 ## Next steps
