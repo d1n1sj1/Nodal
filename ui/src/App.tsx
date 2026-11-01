@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { open, save } from '@tauri-apps/plugin-dialog'
 import Palette from './panels/Palette'
 import Logo from './brand/Logo'
@@ -29,6 +29,8 @@ function App() {
   const [node, setNode] = useState<number | null>(null)
   const [cursor, setCursor] = useState<number | null>(null)
   const [partId, setPartId] = useState<string | null>(null)
+  // Result node indices and warnings belong to the schematic that was run.
+  useEffect(() => setResult(null), [schematic])
   const part = schematic.parts.find((p) => p.id === partId)
   const labels = nodeLabels(schematic)
   const nodes = result?.node_voltages[0]?.length ?? 0

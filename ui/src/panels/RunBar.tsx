@@ -10,7 +10,7 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 const MAX_STEPS = 1e6
 
-interface Props { schematic: Schematic; onResult: (o: SimOutput) => void; mode?: Mode }
+interface Props { schematic: Schematic; onResult: (o: SimOutput | null) => void; mode?: Mode }
 
 export default function RunBar({ schematic, onResult, mode = 'engineer' }: Props) {
   const [stop, setStop] = useState('10m')
@@ -33,6 +33,7 @@ export default function RunBar({ schematic, onResult, mode = 'engineer' }: Props
     }
     const id = ++latest.current
     setError(null)
+    onResult(null) // a failed run must not leave the previous result on screen
     setRunning(true)
     try {
       const out = await runSimulation(circuit, stopS, stepS)

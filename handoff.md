@@ -1,38 +1,65 @@
 # Nodal handoff
 
-Date: 2026-10-31. Status: design and build plan approved by the owner. No product code written yet.
+Date: 2026-11-01. Status: all 14 plan tasks built, reviewed and committed on `main` (24 commits since the docs commit `233aa23`). A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. Nothing has been launched in a real window yet. There is no git remote, so nothing is pushed.
 
 ## What Nodal is
 
-An open-source desktop circuit simulator for students and engineers, for planning projects and testing circuits before building them. It aims for LTspice-class speed with a modern UI that is friendly to learners (the owner likes LTspice's speed, dislikes its dated UI, and finds Multisim friendly but slow).
+An open-source desktop circuit simulator for students and engineers, for planning projects and testing circuits before building them. It aims for LTspice-class speed with a modern UI that is friendly to learners.
 
 One app, two looks selected by a mode switch: Engineer mode (dark, schematic symbols, scope, readouts) and Kids mode (bright white and sky blue, colorful picture tiles, friendly wording). Both show the Nodal logo and name, and every part shows an icon and a name. A part that would be damaged gets a warning and a red highlight.
 
-## Documents
+## Layout
 
-- Design: `docs/superpowers/specs/2026-10-31-nodal-design.md`
-- Build plan: `docs/superpowers/plans/2026-10-31-nodal-v1.md` (14 tasks, test-first)
-- Visual reference mockups: `.superpowers/brainstorm/1776-1793472491/content/two-modes-v4.html` (the owner approved this look; earlier versions v1 to v3 are in the same folder)
+- `crates/nodal-core`: Rust solver (model, MNA stamper with dense and faer sparse LU, DC op, trapezoidal transient, diode/LED Newton, damage detection).
+- `src-tauri`: Tauri v2 shell (`nodal-app`), thin commands `run_simulation`, `save_circuit`, `load_circuit`, dialog plugin, CSP set.
+- `ui`: React + TypeScript (Vite, Vitest). Mode store, themes, parts registry and palette, SVG schematic editor, properties panel, run bar, scope, readouts, warning banner.
+- Docs: design `docs/superpowers/specs/2026-10-31-nodal-design.md`, plan `docs/superpowers/plans/2026-10-31-nodal-v1.md`, visual reference `.superpowers/brainstorm/1776-1793472491/content/two-modes-v4.html`.
+- Packaging: `.github/workflows/ci.yml`, `release.yml` (tags `v*`, draft release, unsigned), icons generated from `src-tauri/icons/source.svg`, root `package.json` holds the Tauri CLI.
+
+## Verified
+
+- `cargo test --workspace` and `npm test --prefix ui` (76 tests) pass; `npm run build --prefix ui` passes.
+- Speed: `cargo test --release -p nodal-core --test speed` passes. The 1,000-node, 1,000-step linear ladder takes about 47 ms; the same ladder with one diode takes about 0.4 s. Target was under 1 s.
+- `npm run tauri build` produced an MSI and an NSIS installer in `target/release/bundle/`.
+
+## Still for the owner
+
+These need a real window and were never run:
+- Launch the app (`npm run tauri dev` or the installer) and confirm the editor loads and a simulation runs under the new CSP (`style-src 'unsafe-inline'` and IPC are the likeliest breakage points).
+- Build the RC filter from the mockup, switch modes, save and reopen a file.
+- Wire 5 V straight across an LED and confirm the red highlight and banner in both modes.
+- Review kids tile artwork and kids wording against `two-modes-v4.html`; both are first drafts.
+- `release.yml` has never run (first tag will test it). Installers are unsigned, so macOS and Windows will warn.
 
 ## Decisions
 
-Confirmed by the owner:
-- One app with a mode switch, not two apps.
-- Rust for the solver core.
-- First version leaves transistors and op-amps for later.
-- Damage handling: warning plus red highlight.
-- Look: the v4 mockups.
-- The owner approved the whole design and plan.
+Confirmed by the owner earlier: one app with a mode switch, Rust solver core, no transistors or op-amps in v1, warning plus red highlight for damage, the v4 mockup look, the whole design and plan.
 
-My calls, approved along with the document but not individually discussed: Tauri shell, React + TypeScript UI, MIT OR Apache-2.0 licence, 1,000-node transient under 1 second, damage computed from simulation results, kids tiles as skins over real parts, mode not saved in the circuit file, Windows/macOS/Linux installers with no auto-update.
+Builder's calls approved with the plan: Tauri shell, React + TypeScript UI, MIT OR Apache-2.0, 1,000-node transient under 1 second, damage computed from simulation results, kids tiles as skins over real parts, mode not stored in the circuit file, installers for Windows/macOS/Linux with no auto-update.
 
-## Next step
+Rulings made during execution (the owner has not reviewed these; each says what it costs if wrong):
+1. Task 5 test chains two runs, but `transient()` had no initial-state input. Added `transient_from` and `TransientResult::final_state()`. Cost: small extra API.
+2. Open switch stamps a 1e-12 S leak; the floating-node check treats an open switch as no DC path, so a node reachable only through one is an error. Cost: possible false error in odd circuits.
+3. Transient starts from rest (capacitors 0 V, inductors 0 A), not from the DC operating point. The plan said DC, but its own charging tests need rest. Cost: pre-charged circuits need an explicit initial state.
+4. Newton convergence residual is `1e-9 + 1e-9*|I|`, not absolute 1e-9 A, so a bare LED across an ideal source gives a finite huge current and can raise a damage warning. The diode curve is linear past 40 thermal voltages. Cost: looser convergence at large currents.
+5. Non-finite warning peaks are clamped to `f64::MAX` so JSON stays a number.
+6. Editor is SVG, not `<canvas>`.
+7. Parts are placed by clicking a palette item then the canvas, not by dragging. Wires can be selected and deleted (unasked). A reloaded kids motor becomes separate resistor and inductor parts, since the file has no skin info. Keyboard operation of parts, pins, placement and delete was added.
+8. A schematic with no Ground part grounds the first voltage source's negative pin (else the first current source's), in both modes. Without it Kids mode can never simulate. Cost: a forgotten ground in Engineer mode no longer errors when a source exists.
+9. Added a properties panel (edit values, open/close switch) on the final reviewer's request; the spec was silent.
+10. Tauri scaffold was written by hand; GUI checks were left to the owner.
 
-Execute the plan. The plan recommends subagent-driven development (superpowers:subagent-driven-development) because the tasks share interfaces. The owner has not yet chosen an execution method, so ask first: subagent-driven, or native (one session implements everything, then one reviewer checks the whole branch).
+## Deferred minors (not fixed)
 
-## Housekeeping
+- Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind`; file `version` is not checked on read in Rust (the UI does check it); `transient_from` validates only node count and part ids; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API; validation errors reuse `SimError::Singular`; Newton rebuilds the sparse ordering every iteration; no DC tests for switch, inductor, capacitor, current source; the speed test cannot tell dense from sparse (tridiagonal) and its diode is never forward-biased; the oversized-result test only asserts `is_err()`.
+- App: `save_circuit` is not atomic; commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
+- UI: kids-tag, active-button and muted-text contrast are borderline; wires are not keyboard operable; focus is lost after a keyboard delete; three tab stops per part; Ground aria-label shows `__ground__`; warnings and node labels can be stale after an edit following a run; a failed run leaves the old result on screen; `parseSI` rejects Greek mu and uppercase `K`; the bulb does not glow; error text is the same in both modes; no undo, no unsaved-changes prompt.
+- Release: macOS runner is arm64 only (no Intel build); `licenseFile` names only the MIT file; category "Education" unconfirmed; actions pinned by tag, not SHA.
+- Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.
 
-- `C:\Users\ernie\OneDrive\Desktop\Nodal` is not a git repo yet. Task 1 of the plan runs `git init`. Add `.superpowers/` to `.gitignore`.
-- The browser mockup server has been stopped. The mockup HTML files are still on disk and open directly in a browser.
-- The kids-mode wording and tile artwork are first drafts; the owner should review them during the manual checks in Tasks 10 and 13.
-- The speed target is unmeasured. Task 6 reports the real time; do not weaken the assertion if it is missed.
+## Next steps
+
+1. Run the owner checks above.
+2. Decide on a git remote and a first `v*` tag to exercise the release workflow.
+3. Triage the deferred minors; the contrast and stale-result items are the cheapest user-visible wins.
+4. Later roadmap: transistors, op-amps, AC analysis, SPICE import/export.

@@ -3,9 +3,9 @@
   --bg: #0f1115;
   --panel: #171a21;
   --text: #e6e8ee;
-  --muted: #7c85a2;
+  --muted: #9aa3bf;
   --border: #262b36;
-  --accent: #6366f1;
+  --accent: #4f46e5;
   --accent2: #34d399;
   --danger: #f87171;
   --danger-tint: rgba(248, 113, 113, 0.18);
@@ -17,9 +17,9 @@
   --bg: #eef6ff;
   --panel: #ffffff;
   --text: #1e293b;
-  --muted: #64748b;
+  --muted: #526074;
   --border: #bfdbfe;
-  --accent: #3b82f6;
+  --accent: #2563eb;
   --accent2: #34d399;
   --coral: #fb7185;
   --danger: #dc2626;
@@ -53,7 +53,7 @@ body { margin: 0; }
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--accent);
+  color: #1d4ed8;
   background: #dbeafe;
 }
 .mode-switch { display: flex; gap: 4px; padding: 3px; border-radius: 999px; background: var(--bg); border: 1px solid var(--border); }
