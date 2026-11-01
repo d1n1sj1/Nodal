@@ -99,8 +99,9 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
         const b = schematic.parts.find((p) => p.id === w.to.part)!
         const pa = pinPos(a, w.from.pin)
         const pb = pinPos(b, w.to.pin)
+        const mx = snap((pa.x + pb.x) / 2) // right-angle route: across, up/down, across
         return (
-          <line key={i} className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
+          <polyline key={i} className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={`${pa.x},${pa.y} ${mx},${pa.y} ${mx},${pb.y} ${pb.x},${pb.y}`}
             onClick={(e) => { e.stopPropagation(); setSelected(`wire:${i}`) }} />
         )
       })}

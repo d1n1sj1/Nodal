@@ -74,11 +74,11 @@ body { margin: 0; }
 .canvas { flex: 1; width: 100%; min-height: 0; outline: none; }
 .canvas-placing { cursor: crosshair; }
 .canvas .grid-dot { fill: var(--border); }
-.canvas .wire { stroke: var(--text); stroke-width: 2.5; cursor: pointer; }
+.canvas .wire { fill: none; stroke: var(--text); stroke-width: 2.5; stroke-linejoin: round; cursor: pointer; }
 .canvas .selected { stroke: var(--accent); }
 .canvas .placed { color: var(--text); cursor: move; }
 .canvas .placed.selected > g { color: var(--accent); }
-.canvas .part-label { fill: var(--text); font-size: 11px; pointer-events: none; }
+.canvas .part-label { fill: var(--text); font-size: 11px; pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 4px; }
 .canvas .pin { fill: var(--panel); stroke: var(--accent); stroke-width: 1.5; cursor: crosshair; }
 .canvas .pin.active { fill: var(--accent); }
 .app-error { margin: 0; padding: 8px 12px; color: #b91c1c; }

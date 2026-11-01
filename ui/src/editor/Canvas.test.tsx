@@ -37,7 +37,7 @@ test('clicking_two_pins_adds_a_wire', () => {
   s = onChange.mock.calls[0][0]
   rerender(<Canvas schematic={s} onChange={onChange} mode="engineer" />)
   expect(s.wires).toHaveLength(1)
-  expect(document.querySelectorAll('line.wire')).toHaveLength(1)
+  expect(document.querySelectorAll('polyline.wire')).toHaveLength(1)
 })
 
 test('keyboard_wires_two_pins', () => {
