@@ -25,3 +25,16 @@ test('selecting_a_part_shows_its_properties', () => {
   fireEvent.keyDown(screen.getByRole('button', { name: 'Select Resistor p1' }), { key: 'Enter' })
   expect((screen.getByLabelText('Resistance (Ω)') as HTMLInputElement).value).toBe('1.00 k')
 })
+
+test('undo_button_removes_the_last_placed_part', () => {
+  render(<App />)
+  fireEvent.click(screen.getByRole('button', { name: 'Engineer' }))
+  expect((screen.getByRole('button', { name: 'Undo' }) as HTMLButtonElement).disabled).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: 'Resistor' }))
+  fireEvent.click(screen.getByRole('application'))
+  expect(screen.getByRole('button', { name: 'Select Resistor p1' })).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(screen.queryByRole('button', { name: 'Select Resistor p1' })).toBeNull()
+  fireEvent.keyDown(document.body, { key: 'y', ctrlKey: true })
+  expect(screen.getByRole('button', { name: 'Select Resistor p1' })).toBeTruthy()
+})
