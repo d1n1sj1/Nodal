@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
-import { partDefs } from '../parts/registry'
+import { kidsPalette, partDefs } from '../parts/registry'
 import Canvas from './Canvas'
 import { addPart, emptySchematic } from './schematic'
 
@@ -105,4 +105,12 @@ test('only_the_selected_part_has_pins_in_the_tab_order_and_escape_cancels_wiring
   expect(document.querySelector('.pin.active')).not.toBeNull()
   fireEvent.keyDown(screen.getByRole('application'), { key: 'Escape' })
   expect(document.querySelector('.pin.active')).toBeNull()
+})
+
+test('kids_bulb_shows_glow_only_when_lit', () => {
+  const s = addPart(emptySchematic(), kidsPalette().find((d) => d.id === 'kids-bulb')!, { x: 100, y: 100 })
+  const { rerender } = render(<Canvas schematic={s} onChange={vi.fn()} mode="kids" glow={new Map([['p1', 0.5]])} />)
+  expect(screen.getByTestId('bulb-glow').getAttribute('opacity')).toBe('0.55')
+  rerender(<Canvas schematic={s} onChange={vi.fn()} mode="kids" glow={new Map([['p1', 0]])} />)
+  expect(screen.queryByTestId('bulb-glow')).toBeNull()
 })

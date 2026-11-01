@@ -18,10 +18,12 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Verified
 
-- `cargo test --workspace` and `npm test --prefix ui` (85 tests) pass; `npm run build --prefix ui` passes.
+- `cargo test --workspace` and `npm test --prefix ui` (86 tests) pass; `npm run build --prefix ui` passes.
 - Speed: `cargo test --release -p nodal-core --test speed` passes. The 1,000-node, 1,000-step linear ladder takes about 47 ms; the same ladder with one diode takes about 0.4 s. Target was under 1 s.
 - `npm run tauri build` produced an MSI and an NSIS installer in `target/release/bundle/`.
 
+- RC filter (5 V, 1 kΩ, 1 µF) checked through the app's `run_simulation` command against 5(1−e^(−t/τ)): worst error 15 µV over 501 points, no warnings. The UI-driven run of the same wiring used default part values, so the curve itself was not checked on the scope.
+- Kids bulb glow checked in the real window (battery + bulb loop: amber halo, opacity 0.55, no console errors); canvas test covers the glow circle.
 - Real-window checks passed (driven over WebView2 CDP, `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222" npm run tauri dev`): app loads, simulation runs over IPC under the CSP with no console errors, LED across 5 V shows banner and red halo in Engineer and Kids mode, Open and Save work (confirmed by the owner).
 
 ## Fixed after first launch
@@ -35,7 +37,6 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Still for the owner
 
-- Correctly wired RC filter: the curve was never checked against the expected exponential.
 - Review kids tile artwork, kids wording and the new contrast colours against `two-modes-v4.html`; first drafts.
 - Wires pass behind part tiles (midpoint jog, no obstacle routing).
 - `release.yml` has never run (first tag will test it). Installers are unsigned, so macOS and Windows will warn.
@@ -62,7 +63,7 @@ Rulings made during execution (the owner has not reviewed these; each says what 
 
 - Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `transient_from` validates only node count and part ids; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API; validation errors reuse `SimError::Singular`; Newton rebuilds the sparse ordering every iteration; the speed test cannot tell dense from sparse (tridiagonal) and its diode is never forward-biased; the oversized-result test only asserts `is_err()`.
 - App: commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
-- UI: the Kids bulb glows after a run (final-sample power over its watt rating, `panels/glow.ts`; not checked in the real window); error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
+- UI: the Kids bulb glows after a run (final-sample power over its watt rating, `panels/glow.ts`); error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
 - Release: macOS runner is arm64 only (no Intel build); `licenseFile` names only the MIT file; category "Education" unconfirmed; actions pinned by tag, not SHA.
 - Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.
 
