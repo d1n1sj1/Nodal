@@ -18,7 +18,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Verified
 
-- `cargo test --workspace` and `npm test --prefix ui` (82 tests) pass; `npm run build --prefix ui` passes.
+- `cargo test --workspace` and `npm test --prefix ui` (84 tests) pass; `npm run build --prefix ui` passes.
 - Speed: `cargo test --release -p nodal-core --test speed` passes. The 1,000-node, 1,000-step linear ladder takes about 47 ms; the same ladder with one diode takes about 0.4 s. Target was under 1 s.
 - `npm run tauri build` produced an MSI and an NSIS installer in `target/release/bundle/`.
 
@@ -62,7 +62,7 @@ Rulings made during execution (the owner has not reviewed these; each says what 
 
 - Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind`; file `version` is not checked on read in Rust (the UI does check it); `transient_from` validates only node count and part ids; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API; validation errors reuse `SimError::Singular`; Newton rebuilds the sparse ordering every iteration; no DC tests for switch, inductor, capacitor, current source; the speed test cannot tell dense from sparse (tridiagonal) and its diode is never forward-biased; the oversized-result test only asserts `is_err()`.
 - App: commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
-- UI: wires are not keyboard operable; focus is lost after a keyboard delete; three tab stops per part; the bulb does not glow; error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
+- UI: the bulb does not glow; error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
 - Release: macOS runner is arm64 only (no Intel build); `licenseFile` names only the MIT file; category "Education" unconfirmed; actions pinned by tag, not SHA.
 - Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.
 

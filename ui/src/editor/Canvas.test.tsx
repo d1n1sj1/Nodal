@@ -79,3 +79,30 @@ test('warned_part_gets_damaged_marker_and_label', () => {
   render(<Canvas schematic={s} onChange={vi.fn()} mode="engineer" damaged={new Set(['p1'])} />)
   expect(screen.getByRole('group', { name: /p1 — warning/ }).getAttribute('class')).toContain('damaged')
 })
+
+test('wire_is_keyboard_selectable_and_deletable_and_delete_refocuses_canvas', () => {
+  const onChange = vi.fn()
+  let s = addPart(addPart(emptySchematic(), 'Resistor', { x: 100, y: 100 }), 'Resistor', { x: 300, y: 100 })
+  s = { ...s, wires: [{ from: { part: 'p1', pin: 1 }, to: { part: 'p2', pin: 0 } }] }
+  render(<Canvas schematic={s} onChange={onChange} mode="engineer" />)
+  const wire = screen.getByRole('button', { name: 'Wire p1 pin 2 to p2 pin 1' })
+  expect(wire.getAttribute('tabindex')).toBe('0')
+  fireEvent.keyDown(wire, { key: 'Enter' })
+  fireEvent.keyDown(wire, { key: 'Delete' })
+  expect(onChange.mock.calls[0][0].wires).toHaveLength(0)
+  expect(document.activeElement).toBe(screen.getByRole('application'))
+})
+
+test('only_the_selected_part_has_pins_in_the_tab_order_and_escape_cancels_wiring', () => {
+  const s = addPart(addPart(emptySchematic(), 'Resistor', { x: 100, y: 100 }), 'Resistor', { x: 300, y: 100 })
+  render(<Canvas schematic={s} onChange={vi.fn()} mode="engineer" />)
+  const tab = (n: string) => screen.getByRole('button', { name: n }).getAttribute('tabindex')
+  expect(tab('p1 pin 1')).toBe('-1')
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Select Resistor p1' }), { key: 'Enter' })
+  expect(tab('p1 pin 1')).toBe('0')
+  expect(tab('p2 pin 1')).toBe('-1')
+  fireEvent.keyDown(screen.getByRole('button', { name: 'p1 pin 1' }), { key: 'Enter' })
+  expect(document.querySelector('.pin.active')).not.toBeNull()
+  fireEvent.keyDown(screen.getByRole('application'), { key: 'Escape' })
+  expect(document.querySelector('.pin.active')).toBeNull()
+})

@@ -64,10 +64,12 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
       onPlaced?.()
       return
     }
+    if (e.key === 'Escape') return setWiring(null)
     if ((e.key !== 'Delete' && e.key !== 'Backspace') || !selected) return
     const [type, id] = selected.split(':')
     onChange(type === 'part' ? removePart(schematic, id) : removeWire(schematic, Number(id)))
     setSelected(null)
+    svg.current?.focus() // the focused element is about to vanish; keep keyboard users on the canvas
   }
 
   const kids = mode === 'kids'
@@ -101,8 +103,10 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
         const pb = pinPos(b, w.to.pin)
         const mx = snap((pa.x + pb.x) / 2) // right-angle route: across, up/down, across
         return (
-          <polyline key={i} className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={`${pa.x},${pa.y} ${mx},${pa.y} ${mx},${pb.y} ${pb.x},${pb.y}`}
-            onClick={(e) => { e.stopPropagation(); setSelected(`wire:${i}`) }} />
+          <polyline key={i} role="button" tabIndex={0} aria-label={`Wire ${w.from.part} pin ${w.from.pin + 1} to ${w.to.part} pin ${w.to.pin + 1}`}
+            className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={`${pa.x},${pa.y} ${mx},${pa.y} ${mx},${pb.y} ${pb.x},${pb.y}`}
+            onClick={(e) => { e.stopPropagation(); setSelected(`wire:${i}`) }}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSelected(`wire:${i}`) } }} />
         )
       })}
 
@@ -135,9 +139,10 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
             <text y="36" textAnchor="middle" className="part-label">{tile ? tile.name : p.def.name}</text>
             {Array.from({ length: pinCount(p) }, (_, i) => {
               const c = pinPos(p, i)
+              // pins join the tab order only for the selected part: one tab stop per part, pins one Tab after selecting
               const active = wiring?.part === p.id && wiring.pin === i
               return (
-                <circle key={i} role="button" tabIndex={0} aria-label={`${p.id} pin ${i + 1}`} className={`pin ${active ? 'active' : ''}`}
+                <circle key={i} role="button" tabIndex={selected === `part:${p.id}` ? 0 : -1} aria-label={`${p.id} pin ${i + 1}`} className={`pin ${active ? 'active' : ''}`}
                   cx={c.x - p.pos.x} cy={c.y - p.pos.y} r="5"
                   onMouseDown={(e) => e.stopPropagation()} onClick={(e) => onPin(e, { part: p.id, pin: i })}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPin(e, { part: p.id, pin: i }) } }} />
