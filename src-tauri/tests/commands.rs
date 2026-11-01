@@ -38,6 +38,7 @@ fn save_then_load_roundtrips_and_save_rejects_garbage() {
     let p = tmp("rt.json");
     save_circuit(p.clone(), BARE_LED.into()).unwrap();
     assert_eq!(load_circuit(p.clone()).unwrap(), BARE_LED);
+    assert!(!std::path::Path::new(&format!("{p}.tmp")).exists());
     std::fs::remove_file(&p).ok();
     let bad = tmp("bad.json");
     assert!(save_circuit(bad.clone(), "garbage".into()).is_err());

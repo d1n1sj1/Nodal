@@ -19,9 +19,9 @@ export function formatSI(value: number, unit: string): string {
 /** Parse "10m", "5u", "1k", "2.5" (plain or SI suffix); NaN if invalid or non-finite.
  *  Suffixes are case-sensitive: "m" = milli, "M" = mega. */
 export function parseSI(text: string): number {
-  const m = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s*([pnuµmkMG]?)\s*$/.exec(text)
+  const m = /^\s*([+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?)\s*([pnuµμmkKMG]?)\s*$/.exec(text)
   if (!m) return NaN
-  const p = m[2] === '' ? '' : m[2] === 'u' ? 'µ' : m[2]
+  const p = m[2] === 'u' || m[2] === 'μ' ? 'µ' : m[2] === 'K' ? 'k' : m[2] // μ is Greek mu, µ is the micro sign
   const i = PREFIXES.indexOf(p)
   const e = (i - 4) * 3
   const v = e < 0 ? Number(m[1]) / 10 ** -e : Number(m[1]) * 10 ** e // divide: 10*1e-6 is inexact

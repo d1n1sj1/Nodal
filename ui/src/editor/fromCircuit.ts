@@ -24,8 +24,8 @@ export function schematicFromCircuit(c: CircuitJson): Schematic {
   let s: Schematic = { parts, wires: [] }
   if (byNode.has(0)) {
     const g = partDefs.find((d) => d.kind === 'Ground')!
-    s = { ...s, parts: [...s.parts, { id: '__ground__', def: g, values: {}, pos: { x: 120, y: 80 + Math.ceil(parts.length / 4) * 120 } }] }
-    byNode.get(0)!.unshift({ part: '__ground__', pin: 0 })
+    s = { ...s, parts: [...s.parts, { id: 'GND', def: g, values: {}, pos: { x: 120, y: 80 + Math.ceil(parts.length / 4) * 120 } }] }
+    byNode.get(0)!.unshift({ part: 'GND', pin: 0 })
   }
   for (const pins of byNode.values()) for (const p of pins.slice(1)) s = addWire(s, pins[0], p)
   return s

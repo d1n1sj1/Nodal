@@ -29,7 +29,14 @@ pub fn run_simulation_impl(circuit_json: &str, stop: f64, step: f64) -> Result<S
 
 pub fn save_circuit_impl(path: &str, circuit_json: &str) -> Result<(), String> {
     Circuit::from_json(circuit_json).map_err(|e| e.to_string())?;
-    std::fs::write(path, circuit_json).map_err(|e| format!("could not write {path}: {e}"))
+    // Write a sibling temp file then rename, so a failed write cannot truncate an existing save.
+    let tmp = format!("{path}.tmp");
+    let err = |e: std::io::Error| format!("could not write {path}: {e}");
+    std::fs::write(&tmp, circuit_json).map_err(err)?;
+    std::fs::rename(&tmp, path).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        err(e)
+    })
 }
 
 pub fn load_circuit_impl(path: &str) -> Result<String, String> {
