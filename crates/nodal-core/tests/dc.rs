@@ -50,7 +50,7 @@ fn empty_circuit_is_error() {
 fn zero_ohm_and_nan_are_errors() {
     let z = p("R0", Resistor { a: n(1), b: n(0), ohms: 0.0, max_watts: 1.0 });
     let c = Circuit { parts: vec![v("V1", 1, 5.0), z] };
-    assert!(matches!(dc_op(&c), Err(SimError::Singular(m)) if m.contains("R0")));
+    assert!(matches!(dc_op(&c), Err(SimError::InvalidInput(m)) if m.contains("R0")));
     let c = Circuit { parts: vec![v("V1", 1, f64::NAN), r("R1", 1, 0)] };
     assert!(dc_op(&c).is_err());
 }

@@ -24,7 +24,7 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
             _ => true,
         };
         if !ok {
-            return Err(SimError::Singular(format!("part {} has an invalid value (must be finite, and resistance above zero)", p.id)));
+            return Err(SimError::InvalidInput(format!("part {} has an invalid value (must be finite, and resistance above zero)", p.id)));
         }
     }
     Ok(())

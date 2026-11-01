@@ -131,3 +131,21 @@ fn diode_reached_only_through_diode_is_not_floating() {
     ]};
     assert!(dc_op(&c).is_ok());
 }
+
+#[test]
+fn transient_from_rejects_bad_initial_state() {
+    let c = series(5.0, false);
+    let good = transient(&c, 1e-4, 1e-5).unwrap().final_state();
+
+    let mut s = good.clone();
+    s.node_voltages[1] = f64::NAN;
+    assert!(matches!(transient_from(&c, &s, 1e-4, 1e-5), Err(SimError::InvalidInput(m)) if m.contains("non-finite")));
+
+    let mut s = good.clone();
+    s.part_currents.insert("R1".into(), f64::INFINITY);
+    assert!(matches!(transient_from(&c, &s, 1e-4, 1e-5), Err(SimError::InvalidInput(_))));
+
+    let mut s = good;
+    s.part_currents.remove("D1");
+    assert!(matches!(transient_from(&c, &s, 1e-4, 1e-5), Err(SimError::InvalidInput(m)) if m.contains("does not match")));
+}

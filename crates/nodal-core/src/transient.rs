@@ -59,26 +59,29 @@ pub fn transient_from(c: &Circuit, initial: &TransientState, stop: f64, step: f6
     validate(c)?;
     check_run(c, stop, step)?;
     if initial.node_voltages.len() != c.node_count() || c.parts.iter().any(|p| !initial.part_currents.contains_key(&p.id)) {
-        return Err(SimError::Singular("initial state does not match the circuit's nodes and parts".into()));
+        return Err(SimError::InvalidInput("initial state does not match the circuit's nodes and parts".into()));
+    }
+    if initial.node_voltages.iter().chain(initial.part_currents.values()).any(|x| !x.is_finite()) {
+        return Err(SimError::InvalidInput("initial state contains a non-finite value".into()));
     }
     run(c, initial.clone(), stop, step)
 }
 
 fn check_run(c: &Circuit, stop: f64, step: f64) -> Result<(), SimError> {
     if !(step.is_finite() && step > 0.0 && stop.is_finite() && stop > 0.0) {
-        return Err(SimError::Singular("transient stop time and step must be finite and above zero".into()));
+        return Err(SimError::InvalidInput("transient stop time and step must be finite and above zero".into()));
     }
     if stop / step > MAX_STEPS {
-        return Err(SimError::Singular("transient run would need more than 10 million steps; use a larger step".into()));
+        return Err(SimError::InvalidInput("transient run would need more than 10 million steps; use a larger step".into()));
     }
     // Bounds stored f64s (node voltages + one current per part), ~400 MB at the cap.
     if (stop / step + 1e-9).floor() * (c.node_count() + c.parts.len()) as f64 > MAX_VALUES {
-        return Err(SimError::Singular("transient result would be too large; use a larger step or a shorter run".into()));
+        return Err(SimError::InvalidInput("transient result would be too large; use a larger step or a shorter run".into()));
     }
     for p in &c.parts {
         if let Capacitor { farads: x, .. } | Inductor { henries: x, .. } = p.kind {
             if !(x.is_finite() && x > 0.0) {
-                return Err(SimError::Singular(format!("part {} has an invalid value (must be finite and above zero)", p.id)));
+                return Err(SimError::InvalidInput(format!("part {} has an invalid value (must be finite and above zero)", p.id)));
             }
         }
     }
