@@ -25,5 +25,6 @@ export const tiles = {
 const GenericPicture = pic(<><rect x="8" y="8" width="28" height="28" rx="8" /><path d="M16 22h12" /></>)
 
 export function tileFor(def: PartDef): KidsTile {
-  return def.kidsTile ?? { name: def.name, color: '#e2e8f0', picture: GenericPicture }
+  const byKind: Partial<Record<PartDef['kind'], KidsTile>> = { VSource: tiles.battery, Switch: tiles.switch, Resistor: tiles.resistor }
+  return def.kidsTile ?? byKind[def.kind] ?? { name: def.name, color: '#e2e8f0', picture: GenericPicture }
 }
