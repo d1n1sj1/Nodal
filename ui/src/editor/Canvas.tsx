@@ -2,6 +2,7 @@ import { useRef, useState, type MouseEvent } from 'react'
 import type { Mode } from '../modes/mode'
 import type { PartDef } from '../parts/registry'
 import { tileFor, tiles } from '../parts/tiles'
+import { routeWire } from './route'
 import { addPart, addWire, movePart, pinCount, pinPos, removePart, removeWire, PART_HALF_WIDTH, PART_HALF_HEIGHT, type Pin, type Pos, type Schematic } from './schematic'
 
 const GRID = 20
@@ -99,21 +100,10 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
       <rect width="100%" height="100%" fill="url(#grid)" />
 
       {schematic.wires.map((w, i) => {
-        const a = schematic.parts.find((p) => p.id === w.from.part)!
-        const b = schematic.parts.find((p) => p.id === w.to.part)!
-        const pa = pinPos(a, w.from.pin)
-        const pb = pinPos(b, w.to.pin)
-        // leave each pin outward (Ground: no stub) so a wire never doubles back across its own part
-        const da = a.def.kind === 'Ground' ? 0 : w.from.pin ? 1 : -1
-        const db = b.def.kind === 'Ground' ? 0 : w.to.pin ? 1 : -1
-        const ea = pa.x + da * GRID
-        const eb = pb.x + db * GRID
-        let mx = snap((ea + eb) / 2) // right-angle route: out, across, up/down, across, in
-        if (da) mx = da > 0 ? Math.max(mx, ea) : Math.min(mx, ea)
-        if (db) mx = db > 0 ? Math.max(mx, eb) : Math.min(mx, eb)
+        const points = routeWire(schematic.parts, w.from, w.to).map((p) => `${p.x},${p.y}`).join(' ')
         return (
           <polyline key={i} role="button" tabIndex={0} aria-label={`Wire ${w.from.part} pin ${w.from.pin + 1} to ${w.to.part} pin ${w.to.pin + 1}`}
-            className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={`${pa.x},${pa.y} ${mx},${pa.y} ${mx},${pb.y} ${pb.x},${pb.y}`}
+            className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={points}
             onClick={(e) => { e.stopPropagation(); setSelected(`wire:${i}`) }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSelected(`wire:${i}`) } }} />
         )

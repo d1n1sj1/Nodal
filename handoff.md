@@ -37,8 +37,8 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Still for the owner
 
-- Review kids tile artwork, kids wording and the new contrast colours against `two-modes-v4.html`; first drafts.
-- Wire routing has no obstacle avoidance: pins facing away from each other still take a plain route and can cross a part.
+- Owner checks done 2026-11-01 ("everything is fine"): kids tile artwork, wording, contrast colours, close prompt, RC curve on the scope.
+- Wire routing (`ui/src/editor/route.ts`) now avoids parts but not other wires; no real-window check yet. Part-free layouts keep the old plain route.
 - `release.yml` has never run (first tag will test it). Installers are unsigned, so macOS and Windows will warn.
 
 ## Decisions
@@ -59,9 +59,13 @@ Rulings made during execution (the owner has not reviewed these; each says what 
 9. Added a properties panel (edit values, open/close switch) on the final reviewer's request; the spec was silent.
 10. Tauri scaffold was written by hand; GUI checks were left to the owner.
 
+## Triage 2026-11-01 (uncommitted)
+
+Done: wire routing around parts; `SimError::InvalidInput` for bad values/run settings/initial state (Singular now only means a singular matrix); `transient_from` rejects non-finite state; speed tests lock `set_dense_max`, diode now conducts (asserted), and a release test checks sparse is >3x faster than dense (0.007 s vs 0.178 s).
+
 ## Deferred minors (not fixed)
 
-- Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `transient_from` validates only node count and part ids; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API; validation errors reuse `SimError::Singular`; Newton rebuilds the sparse ordering every iteration; the speed test cannot tell dense from sparse (tridiagonal) and its diode is never forward-biased; the oversized-result test only asserts `is_err()`.
+- Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API;  Newton rebuilds the sparse ordering every iteration; the oversized-result test only asserts `is_err()`.
 - App: commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
 - UI: the Kids bulb glows after a run (final-sample power over its watt rating, `panels/glow.ts`); error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
 - Release: macOS runner is arm64 only (no Intel build); `licenseFile` names only the MIT file; category "Education" unconfirmed; actions pinned by tag, not SHA.
