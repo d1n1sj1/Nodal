@@ -18,7 +18,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Verified
 
-- `cargo test --workspace` and `npm test --prefix ui` (86 tests) pass; `npm run build --prefix ui` passes.
+- `cargo test --workspace` and `npm test --prefix ui` (87 tests) pass; `npm run build --prefix ui` passes.
 - Speed: `cargo test --release -p nodal-core --test speed` passes. The 1,000-node, 1,000-step linear ladder takes about 47 ms; the same ladder with one diode takes about 0.4 s. Target was under 1 s.
 - `npm run tauri build` produced an MSI and an NSIS installer in `target/release/bundle/`.
 
@@ -32,13 +32,13 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 - Contrast bumps (muted, accent, kids tag); page title `Nodal`.
 - Voltage source symbol has + and - marks (pin 1 left is +; wiring the wrong way gave -5 V).
 - Kids tile fallback for engineer-placed parts, plus an LED tile.
-- Right-angle wires, label halo.
+- Right-angle wires that leave each pin outward (checked in the real window on the Kids battery and bulb loop), label halo.
 - Atomic `save_circuit` (temp file then rename); `parseSI` accepts `μ` and `K`; loaded ground id is `GND`.
 
 ## Still for the owner
 
 - Review kids tile artwork, kids wording and the new contrast colours against `two-modes-v4.html`; first drafts.
-- Wires pass behind part tiles (midpoint jog, no obstacle routing).
+- Wire routing has no obstacle avoidance: pins facing away from each other still take a plain route and can cross a part.
 - `release.yml` has never run (first tag will test it). Installers are unsigned, so macOS and Windows will warn.
 
 ## Decisions
