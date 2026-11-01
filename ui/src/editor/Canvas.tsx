@@ -103,7 +103,14 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
         const b = schematic.parts.find((p) => p.id === w.to.part)!
         const pa = pinPos(a, w.from.pin)
         const pb = pinPos(b, w.to.pin)
-        const mx = snap((pa.x + pb.x) / 2) // right-angle route: across, up/down, across
+        // leave each pin outward (Ground: no stub) so a wire never doubles back across its own part
+        const da = a.def.kind === 'Ground' ? 0 : w.from.pin ? 1 : -1
+        const db = b.def.kind === 'Ground' ? 0 : w.to.pin ? 1 : -1
+        const ea = pa.x + da * GRID
+        const eb = pb.x + db * GRID
+        let mx = snap((ea + eb) / 2) // right-angle route: out, across, up/down, across, in
+        if (da) mx = da > 0 ? Math.max(mx, ea) : Math.min(mx, ea)
+        if (db) mx = db > 0 ? Math.max(mx, eb) : Math.min(mx, eb)
         return (
           <polyline key={i} role="button" tabIndex={0} aria-label={`Wire ${w.from.part} pin ${w.from.pin + 1} to ${w.to.part} pin ${w.to.pin + 1}`}
             className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={`${pa.x},${pa.y} ${mx},${pa.y} ${mx},${pb.y} ${pb.x},${pb.y}`}

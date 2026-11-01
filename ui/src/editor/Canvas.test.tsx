@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, test, vi } from 'vitest'
 import { kidsPalette, partDefs } from '../parts/registry'
 import Canvas from './Canvas'
-import { addPart, emptySchematic } from './schematic'
+import { addPart, addWire, emptySchematic } from './schematic'
 
 afterEach(cleanup)
 
@@ -113,4 +113,14 @@ test('kids_bulb_shows_glow_only_when_lit', () => {
   expect(screen.getByTestId('bulb-glow').getAttribute('opacity')).toBe('0.55')
   rerender(<Canvas schematic={s} onChange={vi.fn()} mode="kids" glow={new Map([['p1', 0]])} />)
   expect(screen.queryByTestId('bulb-glow')).toBeNull()
+})
+
+test('wire_leaves_each_pin_outward_not_across_its_own_part', () => {
+  let s = addPart(emptySchematic(), kidsPalette().find((d) => d.id === 'kids-bulb')!, { x: 300, y: 100 })
+  s = addPart(s, kidsPalette().find((d) => d.id === 'kids-battery')!, { x: 100, y: 160 })
+  s = addWire(s, { part: 'p1', pin: 1 }, { part: 'p2', pin: 1 }) // bulb right pin to battery right pin
+  render(<Canvas schematic={s} onChange={vi.fn()} mode="kids" />)
+  const pts = screen.getByRole('button', { name: /^Wire/ }).getAttribute('points')!.split(' ').map((p) => Number(p.split(',')[0]))
+  expect(pts[1]).toBeGreaterThanOrEqual(334) // bulb right pin x
+  expect(pts[1]).toBeGreaterThanOrEqual(134) // battery right pin x
 })
