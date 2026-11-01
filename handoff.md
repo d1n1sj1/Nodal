@@ -1,6 +1,6 @@
 # Nodal handoff
 
-Date: 2026-11-01. Status: all 14 plan tasks built, reviewed and committed on `main` (24 commits since the docs commit `233aa23`). A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. Nothing has been launched in a real window yet. There is no git remote, so nothing is pushed.
+Date: 2026-11-01. Status: all 14 plan tasks built, reviewed and committed on `main` (24 commits since the docs commit `233aa23`). A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). There is no git remote, so nothing is pushed.
 
 ## What Nodal is
 
@@ -18,17 +18,26 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Verified
 
-- `cargo test --workspace` and `npm test --prefix ui` (76 tests) pass; `npm run build --prefix ui` passes.
+- `cargo test --workspace` and `npm test --prefix ui` (78 tests) pass; `npm run build --prefix ui` passes.
 - Speed: `cargo test --release -p nodal-core --test speed` passes. The 1,000-node, 1,000-step linear ladder takes about 47 ms; the same ladder with one diode takes about 0.4 s. Target was under 1 s.
 - `npm run tauri build` produced an MSI and an NSIS installer in `target/release/bundle/`.
 
+- Real-window checks passed (driven over WebView2 CDP, `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS="--remote-debugging-port=9222" npm run tauri dev`): app loads, simulation runs over IPC under the CSP with no console errors, LED across 5 V shows banner and red halo in Engineer and Kids mode, Open and Save work (confirmed by the owner).
+
+## Fixed after first launch
+
+- Stale results cleared on any schematic edit; a failed run clears the old result.
+- Contrast bumps (muted, accent, kids tag); page title `Nodal`.
+- Voltage source symbol has + and - marks (pin 1 left is +; wiring the wrong way gave -5 V).
+- Kids tile fallback for engineer-placed parts, plus an LED tile.
+- Right-angle wires, label halo.
+- Atomic `save_circuit` (temp file then rename); `parseSI` accepts `μ` and `K`; loaded ground id is `GND`.
+
 ## Still for the owner
 
-These need a real window and were never run:
-- Launch the app (`npm run tauri dev` or the installer) and confirm the editor loads and a simulation runs under the new CSP (`style-src 'unsafe-inline'` and IPC are the likeliest breakage points).
-- Build the RC filter from the mockup, switch modes, save and reopen a file.
-- Wire 5 V straight across an LED and confirm the red highlight and banner in both modes.
-- Review kids tile artwork and kids wording against `two-modes-v4.html`; both are first drafts.
+- Correctly wired RC filter: the curve was never checked against the expected exponential.
+- Review kids tile artwork, kids wording and the new contrast colours against `two-modes-v4.html`; first drafts.
+- Wires pass behind part tiles (midpoint jog, no obstacle routing).
 - `release.yml` has never run (first tag will test it). Installers are unsigned, so macOS and Windows will warn.
 
 ## Decisions
@@ -52,14 +61,14 @@ Rulings made during execution (the owner has not reviewed these; each says what 
 ## Deferred minors (not fixed)
 
 - Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind`; file `version` is not checked on read in Rust (the UI does check it); `transient_from` validates only node count and part ids; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API; validation errors reuse `SimError::Singular`; Newton rebuilds the sparse ordering every iteration; no DC tests for switch, inductor, capacitor, current source; the speed test cannot tell dense from sparse (tridiagonal) and its diode is never forward-biased; the oversized-result test only asserts `is_err()`.
-- App: `save_circuit` is not atomic; commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
-- UI: kids-tag, active-button and muted-text contrast are borderline; wires are not keyboard operable; focus is lost after a keyboard delete; three tab stops per part; Ground aria-label shows `__ground__`; warnings and node labels can be stale after an edit following a run; a failed run leaves the old result on screen; `parseSI` rejects Greek mu and uppercase `K`; the bulb does not glow; error text is the same in both modes; no undo, no unsaved-changes prompt.
+- App: commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
+- UI: wires are not keyboard operable; focus is lost after a keyboard delete; three tab stops per part; the bulb does not glow; error text is the same in both modes; no undo, no unsaved-changes prompt.
 - Release: macOS runner is arm64 only (no Intel build); `licenseFile` names only the MIT file; category "Education" unconfirmed; actions pinned by tag, not SHA.
 - Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.
 
 ## Next steps
 
-1. Run the owner checks above.
+1. Run the remaining owner checks above.
 2. Decide on a git remote and a first `v*` tag to exercise the release workflow.
-3. Triage the deferred minors; the contrast and stale-result items are the cheapest user-visible wins.
+3. Triage the deferred minors.
 4. Later roadmap: transistors, op-amps, AC analysis, SPICE import/export.
