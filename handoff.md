@@ -1,6 +1,6 @@
 # Nodal handoff
 
-Date: 2026-11-01. Status: all 14 plan tasks built, reviewed and committed on `main` (24 commits since the docs commit `233aa23`). A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). There is no git remote, so nothing is pushed.
+Date: 2026-11-02. Status: v0.1.0 tagged and released as a draft. All 14 plan tasks built, reviewed and committed on `main`. A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). Remote: `https://github.com/d1n1sj1/Nodal` (public); `main` and tag `v0.1.0` are pushed.
 
 ## What Nodal is
 
@@ -18,7 +18,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 ## Verified
 
-- `cargo test --workspace` and `npm test --prefix ui` (87 tests) pass; `npm run build --prefix ui` passes.
+- `cargo test --workspace` and `npm test --prefix ui` (90 tests) pass; `npm run build --prefix ui` passes.
 - Speed: `cargo test --release -p nodal-core --test speed` passes. The 1,000-node, 1,000-step linear ladder takes about 47 ms; the same ladder with one diode takes about 0.4 s. Target was under 1 s.
 - `npm run tauri build` produced an MSI and an NSIS installer in `target/release/bundle/`.
 
@@ -38,8 +38,14 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 ## Still for the owner
 
 - Owner checks done 2026-11-01 ("everything is fine"): kids tile artwork, wording, contrast colours, close prompt, RC curve on the scope.
-- Wire routing (`ui/src/editor/route.ts`) now avoids parts but not other wires; no real-window check yet. Part-free layouts keep the old plain route.
-- `release.yml` has never run (first tag will test it). Installers are unsigned, so macOS and Windows will warn.
+- Publish the draft release `v0.1.0` (Releases tab, only visible to the owner) when happy with it.
+- Wire routing (`ui/src/editor/route.ts`) avoids parts but not other wires. Checked in a browser against the Vite server (wire dips under a part in its way), not in the Tauri window.
+- Installers are unsigned, so macOS and Windows will warn (SmartScreen: More info, Run anyway).
+
+## Release
+
+- `v0.1.0` tag at `2d62a86`. `release.yml` ran green on all four jobs (Windows, Linux, macOS arm64, macOS x86_64) and made a draft release; CI is green on `main` and the tag. Asset names were not listed (the API hides drafts); check them in the Releases tab.
+- Release fixes made before tagging: Intel macOS build, `src-tauri/LICENSE.txt` (MIT + Apache) as `licenseFile`, actions pinned by SHA. The "Education" category passed the build.
 
 ## Decisions
 
