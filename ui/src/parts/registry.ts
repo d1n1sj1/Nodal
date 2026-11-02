@@ -29,6 +29,8 @@ export const partDefs: PartDef[] = [
   { id: 'switch', kind: 'Switch', name: 'Switch', symbol: S.SwitchSymbol, defaults: { closed: 1 } }, // 1 = closed, 0 = open
   { id: 'npn', kind: 'Bjt', name: 'NPN transistor', symbol: S.NpnSymbol, defaults: { beta: 100, max_amps: 0.1, pnp: 0 } },
   { id: 'pnp', kind: 'Bjt', name: 'PNP transistor', symbol: S.PnpSymbol, defaults: { beta: 100, max_amps: 0.1, pnp: 1 } },
+  { id: 'nmos', kind: 'Mosfet', name: 'N-MOSFET', symbol: S.NmosSymbol, defaults: { vth: 2, kp: 0.02, max_amps: 0.5, pmos: 0 } },
+  { id: 'pmos', kind: 'Mosfet', name: 'P-MOSFET', symbol: S.PmosSymbol, defaults: { vth: 2, kp: 0.02, max_amps: 0.5, pmos: 1 } },
   { id: 'ground', kind: 'Ground', name: 'Ground', symbol: S.GroundSymbol, defaults: {} },
 ]
 

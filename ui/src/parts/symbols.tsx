@@ -17,4 +17,7 @@ export const SwitchSymbol = sym(<path d="M1 12h9M24 12h9M10 12l12-8" />)
 // Pins: base left, collector top right, emitter bottom right (editor/schematic.ts pinPos).
 export const NpnSymbol = sym(<path d="M1 9h12M13 3v12M13 6l12-5h8M13 12l12 5h8M20 15.5l5 1.5-1.5-4.5" />)
 export const PnpSymbol = sym(<path d="M1 9h12M13 3v12M13 6l12-5h8M13 12l12 5h8M16.5 13.5l-3.5-1.5 1.5 4" />)
+// Pins: gate left, drain top right, source bottom right (editor/schematic.ts pinPos).
+export const NmosSymbol = sym(<path d="M1 9h8M9 3v12M13 3v3M13 7.5v3M13 12v3M13 4h20v-3M13 14h20v3M13 9h20M28 7l-4 2 4 2" />)
+export const PmosSymbol = sym(<path d="M1 9h8M9 3v12M13 3v3M13 7.5v3M13 12v3M13 4h20v-3M13 14h20v3M13 9h20M25 7l4 2-4 2" />)
 export const GroundSymbol = sym(<path d="M17 1v6M9 7h16M12 11h10M15 15h4" />)

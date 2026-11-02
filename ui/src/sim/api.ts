@@ -12,6 +12,7 @@ export type PartJson = { id: string } & (
   | { kind: 'Diode'; anode: NodeId; cathode: NodeId }
   | { kind: 'Led'; anode: NodeId; cathode: NodeId; max_amps: number }
   | { kind: 'Switch'; a: NodeId; b: NodeId; closed: boolean }
+  | { kind: 'Mosfet'; d: NodeId; g: NodeId; s: NodeId; pmos: boolean; vth: number; kp: number; max_amps: number }
   | { kind: 'Bjt'; c: NodeId; b: NodeId; e: NodeId; pnp: boolean; beta: number; max_amps: number }
 )
 

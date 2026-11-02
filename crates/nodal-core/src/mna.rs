@@ -274,6 +274,80 @@ impl BjtModel {
     }
 }
 
+/// Level-1 MOSFET. Gate-source x = p*(vg-vs), drain-source y = p*(vd-vs), p = +1 N / -1 P. gmin across d-s and g-s.
+pub(crate) struct MosModel {
+    d: u32,
+    g: u32,
+    s: u32,
+    p: f64,
+    vth: f64,
+    kp: f64,
+}
+
+/// Drain current (into the drain, polarity-normalised) with partials wrt (x, y).
+struct MosEval { id: f64, gm: f64, gds: f64 }
+
+impl MosModel {
+    pub(crate) fn of(p: &Part) -> Option<MosModel> {
+        match p.kind {
+            PartKind::Mosfet { d, g, s, pmos, vth, kp, .. } => Some(MosModel { d: d.0, g: g.0, s: s.0, p: if pmos { -1.0 } else { 1.0 }, vth, kp }),
+            _ => None,
+        }
+    }
+
+    fn xy(&self, v: &[f64]) -> (f64, f64) {
+        let vs = v[self.s as usize];
+        (self.p * (v[self.g as usize] - vs), self.p * (v[self.d as usize] - vs))
+    }
+
+    /// Forward-region square law for y >= 0.
+    fn forward(&self, x: f64, y: f64) -> MosEval {
+        let vov = x - self.vth;
+        if vov <= 0.0 {
+            MosEval { id: 0.0, gm: 0.0, gds: 0.0 }
+        } else if y < vov {
+            MosEval { id: self.kp * (vov * y - y * y / 2.0), gm: self.kp * y, gds: self.kp * (vov - y) }
+        } else {
+            MosEval { id: self.kp / 2.0 * vov * vov, gm: self.kp * vov, gds: 0.0 }
+        }
+    }
+
+    /// Symmetric device: with y < 0 drain and source swap roles.
+    fn eval(&self, x: f64, y: f64) -> MosEval {
+        if y >= 0.0 { return self.forward(x, y) }
+        let f = self.forward(x - y, -y);
+        MosEval { id: -f.id, gm: -f.gm, gds: f.gm + f.gds }
+    }
+
+    /// Current flowing into the drain, for node voltages indexed by NodeId.
+    pub(crate) fn drain_current(&self, v: &[f64]) -> f64 {
+        let (x, y) = self.xy(v);
+        self.p * self.eval(x, y).id
+    }
+
+    fn stamp(&self, s: &mut Stamper, x0: f64, y0: f64, ev: &MosEval) {
+        let nodes = [self.d, self.g, self.s];
+        let cd = [ev.gds, ev.gm, -(ev.gm + ev.gds)]; // wrt (vd, vg, vs); p cancels
+        let cs = cd.map(|c| -c);
+        // Any point with the right junction voltages works because each row of coefs sums to zero.
+        let v0 = [self.p * y0, self.p * x0, 0.0];
+        let i0 = self.p * ev.id;
+        for (n, (co, i)) in nodes.into_iter().zip([(cd, i0), ([0.0; 3], 0.0), (cs, -i0)]) {
+            for (k, g) in nodes.into_iter().zip(co) { s.transconductance(n, k, g); }
+            s.current(n, 0, i - co.iter().zip(v0).map(|(g, v)| g * v).sum::<f64>());
+        }
+        s.conductance(self.d, self.s, GMIN);
+        s.conductance(self.g, self.s, GMIN);
+    }
+}
+
+pub(crate) fn mosfets(c: &Circuit) -> Vec<MosModel> {
+    c.parts.iter().filter_map(MosModel::of).collect()
+}
+
+/// Largest change of a MOSFET junction voltage per Newton step: keeps the square law from jumping between regions.
+const MOS_STEP: f64 = 1.0;
+
 /// Node voltages indexed by NodeId (ground = 0) from the solved unknowns.
 fn nvec(x: &[f64], n: usize) -> Vec<f64> {
     let mut v = vec![0.0; n];
@@ -308,11 +382,12 @@ impl BjtModel {
 /// adds each junction's companion model and solves. `v0` = starting node voltages (index = NodeId).
 /// Converged when no node moves 1e-6 V or more and every junction's linearisation error is under
 /// 1e-9 A + 1e-9 * |I| (relative part keeps huge currents, e.g. a bare LED on 5 V, from failing on rounding).
-pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
+pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
     let nv = |x: &[f64], i: u32| if i == 0 { 0.0 } else { x[i as usize - 1] };
     let mut prev = v0[1..].to_vec();
     let mut vj: Vec<f64> = js.iter().map(|j| v0[j.a as usize] - v0[j.k as usize]).collect();
     let mut vq: Vec<(f64, f64)> = qs.iter().map(|q| q.xy(v0)).collect();
+    let mut vm: Vec<(f64, f64)> = ms.iter().map(|m| m.xy(v0)).collect();
     for it in 1..=max_iters {
         let mut s = base.clone();
         let mut lin = Vec::with_capacity(js.len());
@@ -328,6 +403,12 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], v0: &[f64
             let ev = q.eval(x0, y0);
             q.stamp(&mut s, x0, y0, &ev);
             qlin.push(ev);
+        }
+        let mut mlin = Vec::with_capacity(ms.len());
+        for (m, &(x0, y0)) in ms.iter().zip(&vm) {
+            let ev = m.eval(x0, y0);
+            m.stamp(&mut s, x0, y0, &ev);
+            mlin.push(ev);
         }
         let x = s.solve(cause)?;
         if x.iter().any(|v| !v.is_finite()) {
@@ -349,6 +430,14 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], v0: &[f64
             let (ic, ib) = (lin.ic + lin.dic[0] * (xn - x0) + lin.dic[1] * (yn - y0), lin.ib + lin.dib[0] * (xn - x0) + lin.dib[1] * (yn - y0));
             resid_ok &= (ev.ic - ic).abs() < 1e-9 + 1e-9 * ev.ic.abs() && (ev.ib - ib).abs() < 1e-9 + 1e-9 * ev.ib.abs();
             vq[idx] = (pnjlim(xn, x0, VT), pnjlim(yn, y0, VT));
+        }
+        for (idx, m) in ms.iter().enumerate() {
+            let (xn, yn) = m.xy(&nvec(&x, v0.len()));
+            let (x0, y0) = vm[idx];
+            let (lin, ev) = (&mlin[idx], m.eval(xn, yn));
+            let id = lin.id + lin.gm * (xn - x0) + lin.gds * (yn - y0);
+            resid_ok &= (ev.id - id).abs() < 1e-9 + 1e-9 * ev.id.abs();
+            vm[idx] = (x0 + (xn - x0).clamp(-MOS_STEP, MOS_STEP), y0 + (yn - y0).clamp(-MOS_STEP, MOS_STEP));
         }
         if dv < 1e-6 && resid_ok {
             return Ok(x);

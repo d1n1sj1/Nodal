@@ -10,7 +10,7 @@ export function schematicFromCircuit(c: CircuitJson): Schematic {
   const parts: PlacedPart[] = []
   const byNode = new Map<number, Pin[]>()
   c.parts.forEach((jp, i) => {
-    const def = partDefs.find((d) => d.kind === jp.kind && (jp.kind !== 'Bjt' || d.defaults.pnp === (jp.pnp ? 1 : 0)))
+    const def = partDefs.find((d) => d.kind === jp.kind && (jp.kind === 'Bjt' ? d.defaults.pnp === (jp.pnp ? 1 : 0) : jp.kind !== 'Mosfet' || d.defaults.pmos === (jp.pmos ? 1 : 0)))
     if (!def) throw new Error(`Unknown part kind "${String((jp as { kind: unknown }).kind)}".`)
     const rec = jp as unknown as Record<string, number | boolean>
     const values: Record<string, number> = {}

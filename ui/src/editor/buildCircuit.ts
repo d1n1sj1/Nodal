@@ -6,7 +6,7 @@ import { pinCount, type Pin, type Schematic } from './schematic'
 export const PIN_FIELDS: Record<PartKindName, string[]> = {
   Resistor: ['a', 'b'], Capacitor: ['a', 'b'], Inductor: ['a', 'b'], Switch: ['a', 'b'],
   VSource: ['pos', 'neg'], ISource: ['from', 'to'], Diode: ['anode', 'cathode'], Led: ['anode', 'cathode'],
-  Bjt: ['c', 'b', 'e'],
+  Bjt: ['c', 'b', 'e'], Mosfet: ['d', 'g', 's'],
 }
 
 export const pinKey = (p: Pin) => `${p.part}:${p.pin}`
@@ -51,6 +51,7 @@ function solve(s: Schematic): { parts: PartJson[]; pins: Map<string, number> } {
       const vals: Record<string, number | boolean> = { ...b.defaults }
       if (b.kind === 'Switch') vals.closed = vals.closed !== 0
       if (b.kind === 'Bjt') vals.pnp = vals.pnp !== 0
+      if (b.kind === 'Mosfet') vals.pmos = vals.pmos !== 0
       const id = builds.length > 1 ? `${p.id}-${b.kind.toLowerCase()}` : p.id
       // a 3-pin part wires each field straight to its own pin; two-pin builds share the series chain
       const keys = fields.length === 3 ? fields.map((_, k) => `${p.id}:${k}`) : [chain[i], chain[i + 1]]
@@ -63,7 +64,7 @@ function solve(s: Schematic): { parts: PartJson[]; pins: Map<string, number> } {
 export const buildCircuit = (s: Schematic): CircuitJson => ({ version: 1, parts: solve(s).parts })
 
 const SIDE: Record<string, string> = { 0: 'left', 1: 'right' }
-const BJT_PINS = ['collector', 'base', 'emitter']
+const THREE_PIN_NAMES: Record<string, string[]> = { Bjt: ['collector', 'base', 'emitter'], Mosfet: ['drain', 'gate', 'source'] }
 
 /** One label per core node, e.g. "2: Resistor p2 right, Resistor p3 left"; node 0 is "0: ground". */
 export function nodeLabels(s: Schematic): string[] {
@@ -72,7 +73,7 @@ export function nodeLabels(s: Schematic): string[] {
     const cut = key.lastIndexOf(':') // loaded ids may contain ':'
     const [id, pin] = [key.slice(0, cut), key.slice(cut + 1)]
     const p = s.parts.find((x) => x.id === id)!
-    ;(names[n] ??= []).push(`${p.def.name} ${id} ${p.def.kind === 'Bjt' ? BJT_PINS[Number(pin)] : SIDE[pin] ?? 'inside'}`)
+    ;(names[n] ??= []).push(`${p.def.name} ${id} ${THREE_PIN_NAMES[p.def.kind]?.[Number(pin)] ?? SIDE[pin] ?? 'inside'}`)
   }
   return Array.from({ length: names.length || 1 }, (_, n) => (n === 0 ? '0: ground' : `${n}: ${names[n].join(', ')}`))
 }

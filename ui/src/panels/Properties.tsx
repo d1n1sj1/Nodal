@@ -7,10 +7,11 @@ import { formatSI, parseSI } from './formatSI'
 const LABELS: Record<string, string> = {
   ohms: 'Resistance (Ω)', max_watts: 'Max power (W)', farads: 'Capacitance (F)', henries: 'Inductance (H)',
   volts: 'Voltage (V)', amps: 'Current (A)', max_amps: 'Max current (A)', beta: 'Current gain (β)',
+  vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)',
 }
 const KIDS_LABELS: Record<string, string> = {
   ohms: 'resistance (ohms)', max_watts: 'power limit (watts)', farads: 'farads', henries: 'henries',
-  volts: 'volts', amps: 'amps', max_amps: 'current limit (amps)', beta: 'gain',
+  volts: 'volts', amps: 'amps', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength',
 }
 const SIGNED = ['volts', 'amps'] // sources may be negative or zero; every other value must be > 0
 const valid = (k: string, v: number) => Number.isFinite(v) && (SIGNED.includes(k) || v > 0)
@@ -26,7 +27,7 @@ export default function Properties({ part, mode, onChange }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const name = kids ? tileFor(part.def).name : part.def.name
   // multi-part kids items (motor) build from fixed defaults, so there is nothing to edit
-  const keys = part.def.builds && part.def.builds.length > 1 ? [] : Object.keys(part.def.defaults).filter((k) => k !== 'closed' && k !== 'pnp')
+  const keys = part.def.builds && part.def.builds.length > 1 ? [] : Object.keys(part.def.defaults).filter((k) => k !== 'closed' && k !== 'pnp' && k !== 'pmos')
   const isSwitch = part.def.kind === 'Switch'
   if (!keys.length && !isSwitch) return null
 

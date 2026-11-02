@@ -16,6 +16,9 @@ pub enum PartKind {
     Led { anode: NodeId, cathode: NodeId, max_amps: f64 },
     Switch { a: NodeId, b: NodeId, closed: bool },
     /// Ebers-Moll transistor (Is = 1e-14 A, reverse beta 1). `beta` = forward current gain; `max_amps` = collector current limit.
+    /// Level-1 (square-law) MOSFET, bulk tied to source, no channel-length modulation. `vth` and `kp` (A/V^2) are
+    /// magnitudes for both polarities; `max_amps` = drain current limit.
+    Mosfet { d: NodeId, g: NodeId, s: NodeId, pmos: bool, vth: f64, kp: f64, max_amps: f64 },
     Bjt { c: NodeId, b: NodeId, e: NodeId, pnp: bool, beta: f64, max_amps: f64 },
 }
 
@@ -33,7 +36,7 @@ pub struct Circuit {
 
 const FILE_VERSION: u64 = 1;
 // keep in step with PartKind: tests/model.rs round-trips every kind and fails if one is missing here.
-const KINDS: [&str; 9] = ["Resistor", "Capacitor", "Inductor", "VSource", "ISource", "Diode", "Led", "Switch", "Bjt"];
+const KINDS: [&str; 10] = ["Resistor", "Capacitor", "Inductor", "VSource", "ISource", "Diode", "Led", "Switch", "Bjt", "Mosfet"];
 
 impl Circuit {
     /// Highest NodeId used + 1 (ground counts); 0 when empty.
@@ -74,6 +77,7 @@ impl Part {
         use PartKind::*;
         let (x, y) = match &self.kind {
             Bjt { c, b, e, .. } => return vec![c.0, b.0, e.0],
+            Mosfet { d, g, s, .. } => return vec![d.0, g.0, s.0],
             Resistor { a, b, .. } | Capacitor { a, b, .. } | Inductor { a, b, .. } | Switch { a, b, .. } => (a, b),
             VSource { pos, neg, .. } => (pos, neg),
             ISource { from, to, .. } => (from, to),
