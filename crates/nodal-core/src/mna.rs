@@ -419,13 +419,25 @@ impl BjtModel {
 /// adds each junction's companion model and solves. `v0` = starting node voltages (index = NodeId).
 /// Converged when no node moves 1e-6 V or more and every junction's linearisation error is under
 /// 1e-9 A + 1e-9 * |I| (relative part keeps huge currents, e.g. a bare LED on 5 V, from failing on rounding).
-pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], os: &[OpampModel], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
+///
+/// `rails`: first try starting every op-amp deep in positive saturation (20 iterations at most). Positive feedback
+/// has an unstable solution between the rails that a linear start converges to; a rail start finds a stable one
+/// instead. Negative-feedback circuits do not converge from there and fall back to the normal start. Use it for the
+/// first solve of a run (DC, first transient step), not every step.
+pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], os: &[OpampModel], v0: &[f64], max_iters: u32, cause: &str, rails: bool) -> Result<Vec<f64>, SimError> {
+    if rails && !os.is_empty() {
+        if let Ok(x) = newton_from(base, js, qs, ms, os, v0, max_iters.min(20), cause, true) { return Ok(x); }
+    }
+    newton_from(base, js, qs, ms, os, v0, max_iters, cause, false)
+}
+
+fn newton_from(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], os: &[OpampModel], v0: &[f64], max_iters: u32, cause: &str, sat: bool) -> Result<Vec<f64>, SimError> {
     let nv = |x: &[f64], i: u32| if i == 0 { 0.0 } else { x[i as usize - 1] };
     let mut prev = v0[1..].to_vec();
     let mut vj: Vec<f64> = js.iter().map(|j| v0[j.a as usize] - v0[j.k as usize]).collect();
     let mut vq: Vec<(f64, f64)> = qs.iter().map(|q| q.xy(v0)).collect();
     let mut vm: Vec<(f64, f64)> = ms.iter().map(|m| m.xy(v0)).collect();
-    let mut vo: Vec<f64> = os.iter().map(|o| o.vd(v0)).collect();
+    let mut vo: Vec<f64> = os.iter().map(|o| if sat { 10.0 * o.vsat / o.gain } else { o.vd(v0) }).collect();
     for it in 1..=max_iters {
         let mut s = base.clone();
         let mut lin = Vec::with_capacity(js.len());

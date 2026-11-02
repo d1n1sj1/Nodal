@@ -52,3 +52,46 @@ fn opamp_json_roundtrip() {
     let c = inverting(1.0);
     assert_eq!(Circuit::from_json(&c.to_json()).unwrap(), c);
 }
+
+/// Inverting Schmitt trigger: Vin (node 1) on minus; out (2) fed back to plus (3) through a 10k/10k divider.
+fn schmitt(vin: f64) -> Circuit {
+    Circuit { parts: vec![
+        part("VIN", VSource { pos: n(1), neg: n(0), volts: vin }),
+        res("R1", 2, 3, 10e3), res("R2", 3, 0, 10e3), res("RL", 2, 0, 10e3),
+        amp(2, 3, 1),
+    ]}
+}
+
+#[test]
+fn schmitt_trigger_settles_in_the_consistent_state() {
+    // Thresholds are +-6 V (half of the 12 V limit). Inside them both rails are stable and the solver picks +12 V;
+    // outside, only one state is self-consistent.
+    let low = dc_op(&schmitt(1.0)).unwrap().node_voltages[2];
+    let high = dc_op(&schmitt(8.0)).unwrap().node_voltages[2];
+    assert!((dc_op(&schmitt(-8.0)).unwrap().node_voltages[2] - 12.0).abs() < 0.05);
+    assert!((low - 12.0).abs() < 0.05, "vin = 1 V: out = {low}");
+    assert!((high + 12.0).abs() < 0.05, "vin = 8 V: out = {high}");
+}
+
+#[test]
+fn schmitt_trigger_at_zero_volts_picks_the_positive_rail() {
+    let out = dc_op(&schmitt(0.0)).unwrap().node_voltages[2]; // 0 V in: out = 0 V is an unstable equilibrium too
+    assert!((out - 12.0).abs() < 0.05, "out = {out}"); // a stable rail, not the unstable mid-point
+}
+
+#[test]
+fn relaxation_oscillator_runs_at_the_textbook_period() {
+    // Out -> R -> minus, C from minus to ground, equal divider to plus: T = 2 R C ln 3.
+    let c = Circuit { parts: vec![
+        res("R", 2, 1, 10e3), part("C", Capacitor { a: n(1), b: n(0), farads: 10e-9 }),
+        res("RA", 2, 3, 10e3), res("RB", 3, 0, 10e3),
+        amp(2, 3, 1),
+    ]};
+    let t = transient(&c, 2e-3, 1e-6).unwrap();
+    let out: Vec<f64> = t.node_voltages.iter().map(|v| v[2]).collect();
+    let rises: Vec<f64> = (1..out.len()).filter(|&i| out[i - 1] < 0.0 && out[i] >= 0.0).map(|i| t.times[i]).collect();
+    assert!(rises.len() >= 5, "rising edges: {}", rises.len());
+    let period = (rises[rises.len() - 1] - rises[1]) / (rises.len() - 2) as f64;
+    let want = 2.0 * 10e3 * 10e-9 * 3f64.ln();
+    assert!((period - want).abs() / want < 0.03, "period {period} vs {want}");
+}

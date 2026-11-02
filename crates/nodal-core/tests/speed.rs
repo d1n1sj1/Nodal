@@ -112,3 +112,52 @@ fn sparse_path_reports_singular() {
     }
     set_dense_max(50);
 }
+
+/// Times a 1,000-node, 1,000-step ladder with `extra` parts added; `active` names the part that must carry current.
+#[cfg(not(debug_assertions))]
+fn timed_with(label: &str, extra: Vec<Part>, active: &str) {
+    let _g = lock();
+    let mut c = ladder(1000);
+    c.parts.extend(extra);
+    let t = std::time::Instant::now();
+    let r = transient(&c, 1e-3, 1e-6).unwrap();
+    let dt = t.elapsed();
+    eprintln!("1,000-node ladder + {label}, 1,000 steps: {dt:?}");
+    assert!(r.part_currents[active].iter().any(|i| i.abs() > 1e-4), "{active} never conducted");
+    assert!(r.node_voltages.last().unwrap().iter().all(|v| v.is_finite()));
+    assert!(dt.as_secs_f64() < 1.0, "took {dt:?}");
+}
+
+#[cfg(not(debug_assertions))]
+fn p(id: &str, kind: nodal_core::PartKind) -> Part { Part { id: id.into(), kind } }
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn thousand_node_ladder_with_bjt_under_one_second() {
+    // Base driven from 1.5 V through 100k (about 8 uA, 800 uA collector current at beta 100) on ladder node 2.
+    timed_with("NPN", vec![
+        p("VB", VSource { pos: NodeId(1001), neg: NodeId(0), volts: 1.5 }),
+        p("RB", Resistor { a: NodeId(1001), b: NodeId(1002), ohms: 100e3, max_watts: 1.0 }),
+        p("Q1", Bjt { c: NodeId(2), b: NodeId(1002), e: NodeId(0), pnp: false, beta: 100.0, max_amps: 1.0 }),
+    ], "Q1");
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn thousand_node_ladder_with_mosfet_under_one_second() {
+    timed_with("N-MOSFET", vec![
+        p("VG", VSource { pos: NodeId(1001), neg: NodeId(0), volts: 4.0 }),
+        p("M1", Mosfet { d: NodeId(2), g: NodeId(1001), s: NodeId(0), pmos: false, vth: 2.0, kp: 0.02, max_amps: 1.0 }),
+    ], "M1");
+}
+
+#[cfg(not(debug_assertions))]
+#[test]
+fn thousand_node_ladder_with_opamp_under_one_second() {
+    // Follower of node 1 (5 V) driving ladder node 2 through 1k (an op-amp output straight onto a capacitor is a
+    // source across a short at rest, so the run would be rejected as singular).
+    timed_with("op-amp", vec![
+        p("U1", Opamp { out: NodeId(1001), plus: NodeId(1), minus: NodeId(1001), gain: 1e5, vsat: 12.0, max_amps: 1.0 }),
+        p("RO", Resistor { a: NodeId(1001), b: NodeId(2), ohms: 1000.0, max_watts: 1.0 }),
+    ], "U1");
+}

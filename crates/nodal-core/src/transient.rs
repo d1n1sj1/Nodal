@@ -156,7 +156,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
             None => {
                 let mut st = s.clone();
                 st.rhs.copy_from_slice(&rhs);
-                newton(&st, &js, &qs, &ms, &os, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
+                newton(&st, &js, &qs, &ms, &os, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE, k == 1)?
             }
         };
         let mut v = vec![0.0; n];
