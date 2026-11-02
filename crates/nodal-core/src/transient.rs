@@ -138,6 +138,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
     let mut node_voltages = Vec::with_capacity(steps + 1);
     node_voltages.push(init.node_voltages);
 
+    let mut order = None; // sparse column order, computed once and reused by every Newton solve
     for k in 1..=steps {
         rhs.copy_from_slice(&base);
         for (i, p) in c.parts.iter().enumerate() {
@@ -156,7 +157,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
             None => {
                 let mut st = s.clone();
                 st.rhs.copy_from_slice(&rhs);
-                newton(&st, &js, &qs, &ms, &os, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE, k == 1)?
+                newton(&st, &js, &qs, &ms, &os, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE, k == 1, &mut order)?
             }
         };
         let mut v = vec![0.0; n];

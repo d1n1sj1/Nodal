@@ -102,7 +102,7 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
     }
     let cause = "voltage sources in a loop or a source across a zero-ohm path";
     let (js, qs, ms, os) = (junctions(c), bjts(c), mosfets(c), opamps(c, &branch_of));
-    let x = if js.is_empty() && qs.is_empty() && ms.is_empty() && os.is_empty() { s.solve(cause)? } else { newton(&s, &js, &qs, &ms, &os, &vec![0.0; n], max_iters, cause, true)? };
+    let x = if js.is_empty() && qs.is_empty() && ms.is_empty() && os.is_empty() { s.solve(cause)? } else { newton(&s, &js, &qs, &ms, &os, &vec![0.0; n], max_iters, cause, true, &mut None)? };
 
     let mut node_voltages = vec![0.0; n];
     node_voltages[1..].copy_from_slice(&x[..n - 1]);
