@@ -7,11 +7,11 @@ import { formatSI, parseSI } from './formatSI'
 const LABELS: Record<string, string> = {
   ohms: 'Resistance (Ω)', max_watts: 'Max power (W)', farads: 'Capacitance (F)', henries: 'Inductance (H)',
   volts: 'Voltage (V)', amps: 'Current (A)', max_amps: 'Max current (A)', beta: 'Current gain (β)',
-  vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)',
+  vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)', gain: 'Gain (V/V)', vsat: 'Output limit (V)',
 }
 const KIDS_LABELS: Record<string, string> = {
   ohms: 'resistance (ohms)', max_watts: 'power limit (watts)', farads: 'farads', henries: 'henries',
-  volts: 'volts', amps: 'amps', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength',
+  volts: 'volts', amps: 'amps', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength', gain: 'gain', vsat: 'output limit (volts)',
 }
 const SIGNED = ['volts', 'amps'] // sources may be negative or zero; every other value must be > 0
 const valid = (k: string, v: number) => Number.isFinite(v) && (SIGNED.includes(k) || v > 0)

@@ -1,5 +1,5 @@
 use crate::dc::{dc_op, validate};
-use crate::mna::{bjts, junctions, mosfets, newton, BjtModel, Junction, MosModel, Stamper, MAX_NEWTON_ITERS};
+use crate::mna::{bjts, junctions, mosfets, newton, opamps, BjtModel, Junction, MosModel, Stamper, MAX_NEWTON_ITERS};
 use crate::{Circuit, NodeId, PartKind::*, SimError};
 use std::collections::HashMap;
 
@@ -93,7 +93,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
     let n = c.node_count();
     let mut branch_of = HashMap::new();
     for p in &c.parts {
-        if matches!(p.kind, VSource { .. } | Inductor { .. } | Switch { closed: true, .. }) {
+        if matches!(p.kind, VSource { .. } | Inductor { .. } | Opamp { .. } | Switch { closed: true, .. }) {
             branch_of.insert(p.id.as_str(), branch_of.len());
         }
     }
@@ -115,14 +115,15 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                 s.voltage_source(k, a.0, b.0, 0.0);
                 s.branch_resistance(k, 2.0 * henries / step);
             }
+            Opamp { out, .. } => s.voltage_source(branch_of[p.id.as_str()], out.0, 0, 0.0), // control terms stamped per Newton iteration
             Diode { .. } | Led { .. } | Bjt { .. } | Mosfet { .. } => {} // stamped per Newton iteration
         }
     }
     let base = s.rhs.clone();
     let mut rhs = base.clone();
-    let (js, qs, ms) = (junctions(c), bjts(c), mosfets(c));
+    let (js, qs, ms, os) = (junctions(c), bjts(c), mosfets(c), opamps(c, &branch_of));
     // Linear fast path: factor once. Nonlinear: newton re-stamps from a clone of `s` every iteration.
-    let fast = if js.is_empty() && qs.is_empty() && ms.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
+    let fast = if js.is_empty() && qs.is_empty() && ms.is_empty() && os.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
 
     // Per-part history: current through and voltage across (a - b) at the previous point.
     let mut ist: Vec<f64> = c.parts.iter().map(|p| init.part_currents[&p.id]).collect();
@@ -155,7 +156,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
             None => {
                 let mut st = s.clone();
                 st.rhs.copy_from_slice(&rhs);
-                newton(&st, &js, &qs, &ms, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
+                newton(&st, &js, &qs, &ms, &os, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
             }
         };
         let mut v = vec![0.0; n];
@@ -165,7 +166,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                 Resistor { a, b, ohms, .. } => vd(&v, a, b) / ohms,
                 ISource { amps, .. } => amps,
                 Switch { a, b, closed: false } => vd(&v, a, b) * OPEN_SWITCH_SIEMENS,
-                VSource { .. } | Switch { .. } => x[rows[i]],
+                VSource { .. } | Opamp { .. } | Switch { .. } => x[rows[i]],
                 Inductor { a, b, .. } => { vst[i] = vd(&v, a, b); x[rows[i]] }
                 Capacitor { a, b, farads } => {
                     let vn = vd(&v, a, b);

@@ -73,7 +73,8 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 
 - BJT (NPN/PNP) done: `PartKind::Bjt` (Ebers-Moll, Is 1e-14 A, reverse beta 1, no Early effect), Newton handles 3-terminal parts, current reported is into the collector (PNP negative), over-current damage on collector current. UI: two palette items, 3-pin symbol (pin 0 collector, 1 base, 2 emitter), beta and max-current editable. Tests: `crates/nodal-core/tests/bjt.rs`, `ui/src/editor/bjt.test.ts`.
 - MOSFET (N/P) done: `PartKind::Mosfet` (level-1 square law, bulk at source, no channel-length modulation, symmetric drain/source swap, Newton steps limited to 1 V per junction), drain current reported into the drain, over-current damage, same three-pin UI (0 drain, 1 gate, 2 source), `vth` and `kp` editable. Tests: `crates/nodal-core/tests/mosfet.rs`, `ui/src/editor/mosfet.test.ts`. No gate-capacitance or body diode, so switching circuits look ideal.
-- Not done for BJT: Kids tile (falls back to the generic tile), real-window check, speed test with BJTs. Next: op-amps, AC analysis, SPICE import/export.
+- Op-amp done: `PartKind::Opamp` (behavioural, ground referenced, no supply pins: out = vsat*tanh(gain*(plus-minus)/vsat), so the limit is soft, ~1.6 mV low at 10 V of 12 V; inputs draw no current). Output is a branch unknown, current reported into the output pin (negative when sourcing), over-current warning above `max_amps` (a warning, not a clamp). UI: palette item, symbol with inputs left (pin 1 +, pin 2 -) and output right (pin 0), gain and output limit editable. Tests: `crates/nodal-core/tests/opamp.rs`, `ui/src/editor/opamp.test.ts`. Newton for the op-amp is undamped; odd positive-feedback circuits may fail to converge.
+- Not done for BJT: Kids tile (falls back to the generic tile), real-window check, speed test with BJTs. Next: AC analysis, SPICE import/export.
 
 ## Deferred minors (not fixed)
 

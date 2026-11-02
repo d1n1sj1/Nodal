@@ -1,4 +1,4 @@
-use crate::mna::{bjts, junctions, mosfets, newton, BjtModel, Junction, MosModel, Stamper, MAX_NEWTON_ITERS};
+use crate::mna::{bjts, junctions, mosfets, newton, opamps, BjtModel, Junction, MosModel, Stamper, MAX_NEWTON_ITERS};
 use crate::{Circuit, PartKind::*, SimError};
 use std::collections::HashMap;
 
@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub struct DcResult {
     /// index = NodeId.0, [0] = 0.0
     pub node_voltages: Vec<f64>,
-    /// by part id. Resistor/inductor/switch: a->b. VSource: pos->neg through the source. ISource: from->to. Diode/LED: anode->cathode. Bjt: current into the collector. Mosfet: current into the drain.
+    /// by part id. Resistor/inductor/switch: a->b. VSource: pos->neg through the source. ISource: from->to. Diode/LED: anode->cathode. Bjt: current into the collector. Mosfet: current into the drain. Opamp: current into the output pin.
     pub part_currents: HashMap<String, f64>,
 }
 
@@ -22,6 +22,7 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
             Resistor { ohms, .. } => ohms.is_finite() && ohms > 0.0,
             Capacitor { farads: x, .. } | Inductor { henries: x, .. } | VSource { volts: x, .. } | ISource { amps: x, .. } => x.is_finite(),
             Bjt { beta, .. } => beta.is_finite() && beta > 0.0,
+            Opamp { gain, vsat, .. } => gain.is_finite() && gain > 0.0 && vsat.is_finite() && vsat > 0.0,
             Mosfet { vth, kp, .. } => vth.is_finite() && vth > 0.0 && kp.is_finite() && kp > 0.0,
             _ => true,
         };
@@ -68,6 +69,12 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
             }
         }
     }
+    for p in &c.parts {
+        if let Opamp { out, .. } = p.kind {
+            let (ro, r0) = (find(&mut uf, out.0 as usize), find(&mut uf, 0));
+            uf[ro] = r0;
+        }
+    }
     let g = find(&mut uf, 0);
     if let Some(i) = (1..n).find(|&i| find(&mut uf, i) != g) {
         return Err(SimError::FloatingNode(i as u32));
@@ -76,7 +83,7 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
     // Branch unknowns: voltage sources, inductors and closed switches (0 V in DC).
     let mut branch_of = HashMap::new();
     for p in &c.parts {
-        if matches!(p.kind, VSource { .. } | Inductor { .. } | Switch { closed: true, .. }) {
+        if matches!(p.kind, VSource { .. } | Inductor { .. } | Opamp { .. } | Switch { closed: true, .. }) {
             branch_of.insert(p.id.as_str(), branch_of.len());
         }
     }
@@ -89,12 +96,13 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
             VSource { pos, neg, volts } => s.voltage_source(k.unwrap(), pos.0, neg.0, volts),
             Inductor { a, b, .. } | Switch { a, b, closed: true } => s.voltage_source(k.unwrap(), a.0, b.0, 0.0),
             Switch { a, b, closed: false } => s.conductance(a.0, b.0, OPEN_SWITCH_SIEMENS),
+            Opamp { out, .. } => s.voltage_source(k.unwrap(), out.0, 0, 0.0),
             Capacitor { .. } | Diode { .. } | Led { .. } | Bjt { .. } | Mosfet { .. } => {} // open in DC / junctions stamped by newton
         }
     }
     let cause = "voltage sources in a loop or a source across a zero-ohm path";
-    let (js, qs, ms) = (junctions(c), bjts(c), mosfets(c));
-    let x = if js.is_empty() && qs.is_empty() && ms.is_empty() { s.solve(cause)? } else { newton(&s, &js, &qs, &ms, &vec![0.0; n], max_iters, cause)? };
+    let (js, qs, ms, os) = (junctions(c), bjts(c), mosfets(c), opamps(c, &branch_of));
+    let x = if js.is_empty() && qs.is_empty() && ms.is_empty() && os.is_empty() { s.solve(cause)? } else { newton(&s, &js, &qs, &ms, &os, &vec![0.0; n], max_iters, cause)? };
 
     let mut node_voltages = vec![0.0; n];
     node_voltages[1..].copy_from_slice(&x[..n - 1]);
@@ -105,7 +113,7 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
             Resistor { a, b, ohms, .. } => (v(a) - v(b)) / ohms,
             ISource { amps, .. } => amps,
             Switch { a, b, closed: false } => (v(a) - v(b)) * OPEN_SWITCH_SIEMENS,
-            VSource { .. } | Inductor { .. } | Switch { .. } => x[n - 1 + branch_of[p.id.as_str()]],
+            VSource { .. } | Inductor { .. } | Opamp { .. } | Switch { .. } => x[n - 1 + branch_of[p.id.as_str()]],
             Diode { .. } | Led { .. } => Junction::of(p).unwrap().current(&node_voltages),
             Mosfet { .. } => MosModel::of(p).unwrap().drain_current(&node_voltages),
             Bjt { .. } => BjtModel::of(p).unwrap().collector_current(&node_voltages),

@@ -6,7 +6,7 @@ import { pinCount, type Pin, type Schematic } from './schematic'
 export const PIN_FIELDS: Record<PartKindName, string[]> = {
   Resistor: ['a', 'b'], Capacitor: ['a', 'b'], Inductor: ['a', 'b'], Switch: ['a', 'b'],
   VSource: ['pos', 'neg'], ISource: ['from', 'to'], Diode: ['anode', 'cathode'], Led: ['anode', 'cathode'],
-  Bjt: ['c', 'b', 'e'], Mosfet: ['d', 'g', 's'],
+  Bjt: ['c', 'b', 'e'], Mosfet: ['d', 'g', 's'], Opamp: ['out', 'plus', 'minus'],
 }
 
 export const pinKey = (p: Pin) => `${p.part}:${p.pin}`
@@ -64,7 +64,7 @@ function solve(s: Schematic): { parts: PartJson[]; pins: Map<string, number> } {
 export const buildCircuit = (s: Schematic): CircuitJson => ({ version: 1, parts: solve(s).parts })
 
 const SIDE: Record<string, string> = { 0: 'left', 1: 'right' }
-const THREE_PIN_NAMES: Record<string, string[]> = { Bjt: ['collector', 'base', 'emitter'], Mosfet: ['drain', 'gate', 'source'] }
+const THREE_PIN_NAMES: Record<string, string[]> = { Bjt: ['collector', 'base', 'emitter'], Mosfet: ['drain', 'gate', 'source'], Opamp: ['output', 'non-inverting input', 'inverting input'] }
 
 /** One label per core node, e.g. "2: Resistor p2 right, Resistor p3 left"; node 0 is "0: ground". */
 export function nodeLabels(s: Schematic): string[] {

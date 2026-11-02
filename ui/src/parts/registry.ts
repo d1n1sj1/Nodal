@@ -31,6 +31,7 @@ export const partDefs: PartDef[] = [
   { id: 'pnp', kind: 'Bjt', name: 'PNP transistor', symbol: S.PnpSymbol, defaults: { beta: 100, max_amps: 0.1, pnp: 1 } },
   { id: 'nmos', kind: 'Mosfet', name: 'N-MOSFET', symbol: S.NmosSymbol, defaults: { vth: 2, kp: 0.02, max_amps: 0.5, pmos: 0 } },
   { id: 'pmos', kind: 'Mosfet', name: 'P-MOSFET', symbol: S.PmosSymbol, defaults: { vth: 2, kp: 0.02, max_amps: 0.5, pmos: 1 } },
+  { id: 'opamp', kind: 'Opamp', name: 'Op-amp', symbol: S.OpampSymbol, defaults: { gain: 1e5, vsat: 12, max_amps: 0.025 } },
   { id: 'ground', kind: 'Ground', name: 'Ground', symbol: S.GroundSymbol, defaults: {} },
 ]
 

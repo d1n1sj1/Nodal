@@ -8,20 +8,21 @@ export interface Wire { from: Pin; to: Pin }
 export interface Schematic { parts: PlacedPart[]; wires: Wire[] }
 
 export const emptySchematic = (): Schematic => ({ parts: [], wires: [] })
-const threePin = (p: PlacedPart) => p.def.kind === 'Bjt' || p.def.kind === 'Mosfet'
-export const pinCount = (p: PlacedPart) => (p.def.kind === 'Ground' ? 1 : threePin(p) ? 3 : 2)
+const threePin = (p: PlacedPart) => p.def.kind === 'Bjt' || p.def.kind === 'Mosfet' // transistor layout: pin 1 left, pins 0 and 2 right
+export const pinCount = (p: PlacedPart) => (p.def.kind === 'Ground' ? 1 : threePin(p) || p.def.kind === 'Opamp' ? 3 : 2)
 
 export const PART_HALF_WIDTH = 34
 export const PART_HALF_HEIGHT = 22
 /** Canvas position of a pin: two-pin parts left/right, Ground on top, a BJT has pins 0 collector (top right), 1 base (left), 2 emitter (bottom right); a MOSFET 0 drain, 1 gate, 2 source in the same places. */
 export const pinPos = (p: PlacedPart, i: number): Pos =>
   p.def.kind === 'Ground' ? { x: p.pos.x, y: p.pos.y - 16 }
+    : p.def.kind === 'Opamp' ? (i ? { x: p.pos.x - PART_HALF_WIDTH, y: p.pos.y + (i === 1 ? -12 : 12) } : { x: p.pos.x + PART_HALF_WIDTH, y: p.pos.y }) // 0 out, 1 in+, 2 in-
     : threePin(p) ? { x: p.pos.x + (i === 1 ? -PART_HALF_WIDTH : PART_HALF_WIDTH), y: p.pos.y + (i - 1) * 16 }
     : { x: p.pos.x + (i ? PART_HALF_WIDTH : -PART_HALF_WIDTH), y: p.pos.y }
 
 /** Side a wire leaves a pin: -1 left, 1 right, 0 up (Ground). */
 export const pinDir = (p: PlacedPart, i: number): number =>
-  p.def.kind === 'Ground' ? 0 : threePin(p) ? (i === 1 ? -1 : 1) : i ? 1 : -1
+  p.def.kind === 'Ground' ? 0 : p.def.kind === 'Opamp' ? (i ? -1 : 1) : threePin(p) ? (i === 1 ? -1 : 1) : i ? 1 : -1
 
 const samePin = (a: Pin, b: Pin) => a.part === b.part && a.pin === b.pin
 

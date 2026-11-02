@@ -19,6 +19,9 @@ pub enum PartKind {
     /// Level-1 (square-law) MOSFET, bulk tied to source, no channel-length modulation. `vth` and `kp` (A/V^2) are
     /// magnitudes for both polarities; `max_amps` = drain current limit.
     Mosfet { d: NodeId, g: NodeId, s: NodeId, pmos: bool, vth: f64, kp: f64, max_amps: f64 },
+    /// Behavioural op-amp, ground referenced: out = vsat * tanh(gain * (plus - minus) / vsat), so the limit is soft: about 1.6 mV low at 10 V of a 12 V limit. Inputs draw no current.
+    /// `max_amps` = output current limit (a warning, not a clamp).
+    Opamp { out: NodeId, plus: NodeId, minus: NodeId, gain: f64, vsat: f64, max_amps: f64 },
     Bjt { c: NodeId, b: NodeId, e: NodeId, pnp: bool, beta: f64, max_amps: f64 },
 }
 
@@ -36,7 +39,7 @@ pub struct Circuit {
 
 const FILE_VERSION: u64 = 1;
 // keep in step with PartKind: tests/model.rs round-trips every kind and fails if one is missing here.
-const KINDS: [&str; 10] = ["Resistor", "Capacitor", "Inductor", "VSource", "ISource", "Diode", "Led", "Switch", "Bjt", "Mosfet"];
+const KINDS: [&str; 11] = ["Resistor", "Capacitor", "Inductor", "VSource", "ISource", "Diode", "Led", "Switch", "Bjt", "Mosfet", "Opamp"];
 
 impl Circuit {
     /// Highest NodeId used + 1 (ground counts); 0 when empty.
@@ -78,6 +81,7 @@ impl Part {
         let (x, y) = match &self.kind {
             Bjt { c, b, e, .. } => return vec![c.0, b.0, e.0],
             Mosfet { d, g, s, .. } => return vec![d.0, g.0, s.0],
+            Opamp { out, plus, minus, .. } => return vec![out.0, plus.0, minus.0],
             Resistor { a, b, .. } | Capacitor { a, b, .. } | Inductor { a, b, .. } | Switch { a, b, .. } => (a, b),
             VSource { pos, neg, .. } => (pos, neg),
             ISource { from, to, .. } => (from, to),

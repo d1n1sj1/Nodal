@@ -20,4 +20,6 @@ export const PnpSymbol = sym(<path d="M1 9h12M13 3v12M13 6l12-5h8M13 12l12 5h8M1
 // Pins: gate left, drain top right, source bottom right (editor/schematic.ts pinPos).
 export const NmosSymbol = sym(<path d="M1 9h8M9 3v12M13 3v3M13 7.5v3M13 12v3M13 4h20v-3M13 14h20v3M13 9h20M28 7l-4 2 4 2" />)
 export const PmosSymbol = sym(<path d="M1 9h8M9 3v12M13 3v3M13 7.5v3M13 12v3M13 4h20v-3M13 14h20v3M13 9h20M25 7l4 2-4 2" />)
+// Pins: inputs left (+ above -), output right (editor/schematic.ts pinPos).
+export const OpampSymbol = sym(<path d="M1 3h8M1 15h8M9 0v18l20-9zM29 9h4M12 5h3M13.5 3.5v3M12 13h3" />)
 export const GroundSymbol = sym(<path d="M17 1v6M9 7h16M12 11h10M15 15h4" />)

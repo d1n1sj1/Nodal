@@ -51,6 +51,15 @@ impl Stamper {
         if let (Some(i), Some(j)) = (Self::idx(row), Self::idx(col)) { self.stamps.push((i, j, g)); }
     }
 
+    /// Branch `k`'s row gets `g_plus * v(plus) + g_minus * v(minus)` added on the left and `rhs` on the right
+    /// (a controlled source: pair with `voltage_source(k, out, 0, 0.0)`, which stamps v(out) itself).
+    pub fn branch_control(&mut self, k: usize, plus: u32, minus: u32, g_plus: f64, g_minus: f64, rhs: f64) {
+        let row = self.nodes + k;
+        if let Some(j) = Self::idx(plus) { self.stamps.push((row, j, g_plus)); }
+        if let Some(j) = Self::idx(minus) { self.stamps.push((row, j, g_minus)); }
+        self.rhs[row] += rhs;
+    }
+
     /// Current `amps` flows from `from` through the source to `to`.
     pub fn current(&mut self, from: u32, to: u32, amps: f64) {
         if let Some(i) = Self::idx(from) { self.rhs[i] -= amps; }
@@ -348,6 +357,34 @@ pub(crate) fn mosfets(c: &Circuit) -> Vec<MosModel> {
 /// Largest change of a MOSFET junction voltage per Newton step: keeps the square law from jumping between regions.
 const MOS_STEP: f64 = 1.0;
 
+/// Op-amp output stage: branch `k` forces v(out) = vsat * tanh(gain * (v(plus) - v(minus)) / vsat).
+pub(crate) struct OpampModel {
+    out_k: usize,
+    plus: u32,
+    minus: u32,
+    gain: f64,
+    vsat: f64,
+}
+
+impl OpampModel {
+    fn f(&self, vd: f64) -> (f64, f64) {
+        let t = (self.gain * vd / self.vsat).tanh();
+        (self.vsat * t, self.gain * (1.0 - t * t))
+    }
+
+    fn vd(&self, v: &[f64]) -> f64 {
+        v[self.plus as usize] - v[self.minus as usize]
+    }
+}
+
+/// `branch_of` gives each op-amp's branch index (the caller stamps `voltage_source(k, out, 0, 0.0)` for it).
+pub(crate) fn opamps(c: &Circuit, branch_of: &std::collections::HashMap<&str, usize>) -> Vec<OpampModel> {
+    c.parts.iter().filter_map(|p| match p.kind {
+        PartKind::Opamp { plus, minus, gain, vsat, .. } => Some(OpampModel { out_k: branch_of[p.id.as_str()], plus: plus.0, minus: minus.0, gain, vsat }),
+        _ => None,
+    }).collect()
+}
+
 /// Node voltages indexed by NodeId (ground = 0) from the solved unknowns.
 fn nvec(x: &[f64], n: usize) -> Vec<f64> {
     let mut v = vec![0.0; n];
@@ -382,12 +419,13 @@ impl BjtModel {
 /// adds each junction's companion model and solves. `v0` = starting node voltages (index = NodeId).
 /// Converged when no node moves 1e-6 V or more and every junction's linearisation error is under
 /// 1e-9 A + 1e-9 * |I| (relative part keeps huge currents, e.g. a bare LED on 5 V, from failing on rounding).
-pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
+pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], os: &[OpampModel], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
     let nv = |x: &[f64], i: u32| if i == 0 { 0.0 } else { x[i as usize - 1] };
     let mut prev = v0[1..].to_vec();
     let mut vj: Vec<f64> = js.iter().map(|j| v0[j.a as usize] - v0[j.k as usize]).collect();
     let mut vq: Vec<(f64, f64)> = qs.iter().map(|q| q.xy(v0)).collect();
     let mut vm: Vec<(f64, f64)> = ms.iter().map(|m| m.xy(v0)).collect();
+    let mut vo: Vec<f64> = os.iter().map(|o| o.vd(v0)).collect();
     for it in 1..=max_iters {
         let mut s = base.clone();
         let mut lin = Vec::with_capacity(js.len());
@@ -409,6 +447,12 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[Mos
             let ev = m.eval(x0, y0);
             m.stamp(&mut s, x0, y0, &ev);
             mlin.push(ev);
+        }
+        let mut olin = Vec::with_capacity(os.len());
+        for (o, &vd0) in os.iter().zip(&vo) {
+            let (f0, df) = o.f(vd0);
+            s.branch_control(o.out_k, o.plus, o.minus, -df, df, f0 - df * vd0);
+            olin.push((f0, df));
         }
         let x = s.solve(cause)?;
         if x.iter().any(|v| !v.is_finite()) {
@@ -438,6 +482,13 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[Mos
             let id = lin.id + lin.gm * (xn - x0) + lin.gds * (yn - y0);
             resid_ok &= (ev.id - id).abs() < 1e-9 + 1e-9 * ev.id.abs();
             vm[idx] = (x0 + (xn - x0).clamp(-MOS_STEP, MOS_STEP), y0 + (yn - y0).clamp(-MOS_STEP, MOS_STEP));
+        }
+        for (idx, o) in os.iter().enumerate() {
+            let vd = o.vd(&nvec(&x, v0.len()));
+            let (f0, df) = olin[idx];
+            let f = o.f(vd).0;
+            resid_ok &= (f - (f0 + df * (vd - vo[idx]))).abs() < 1e-9 + 1e-9 * f.abs();
+            vo[idx] = vd;
         }
         if dv < 1e-6 && resid_ok {
             return Ok(x);
