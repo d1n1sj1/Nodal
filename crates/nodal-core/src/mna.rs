@@ -46,6 +46,11 @@ impl Stamper {
         }
     }
 
+    /// Adds `g` to the matrix at node row `row`, node column `col` (a dependent-source term). Ground is skipped.
+    pub fn transconductance(&mut self, row: u32, col: u32, g: f64) {
+        if let (Some(i), Some(j)) = (Self::idx(row), Self::idx(col)) { self.stamps.push((i, j, g)); }
+    }
+
     /// Current `amps` flows from `from` through the source to `to`.
     pub fn current(&mut self, from: u32, to: u32, amps: f64) {
         if let Some(i) = Self::idx(from) { self.rhs[i] -= amps; }
@@ -224,14 +229,90 @@ fn pnjlim(vnew: f64, vold: f64, nvt: f64) -> f64 {
     }
 }
 
-/// Newton-Raphson over the junctions. `base` holds the linear stamps (and rhs); each iteration clones it,
+const BETA_R: f64 = 1.0;
+
+/// An Ebers-Moll BJT. Junction voltages x = p*(vb-ve), y = p*(vb-vc), p = +1 NPN / -1 PNP, so one set of
+/// equations serves both polarities. gmin sits across b-e and b-c.
+pub(crate) struct BjtModel {
+    c: u32,
+    b: u32,
+    e: u32,
+    p: f64,
+    beta: f64,
+}
+
+/// Collector and base current (into the device) and their partials wrt (x, y).
+struct BjtEval { ic: f64, ib: f64, dic: [f64; 2], dib: [f64; 2] }
+
+impl BjtModel {
+    pub(crate) fn of(p: &Part) -> Option<BjtModel> {
+        match p.kind {
+            PartKind::Bjt { c, b, e, pnp, beta, .. } => Some(BjtModel { c: c.0, b: b.0, e: e.0, p: if pnp { -1.0 } else { 1.0 }, beta }),
+            _ => None,
+        }
+    }
+
+    fn xy(&self, v: &[f64]) -> (f64, f64) {
+        let vb = v[self.b as usize];
+        (self.p * (vb - v[self.e as usize]), self.p * (vb - v[self.c as usize]))
+    }
+
+    fn eval(&self, x: f64, y: f64) -> BjtEval {
+        let ((f, gf), (r, gr)) = (shockley(x, VT), shockley(y, VT));
+        BjtEval {
+            ic: f - r * (1.0 + 1.0 / BETA_R),
+            ib: f / self.beta + r / BETA_R,
+            dic: [gf, -gr * (1.0 + 1.0 / BETA_R)],
+            dib: [gf / self.beta, gr / BETA_R],
+        }
+    }
+
+    /// Current flowing into the collector, for node voltages indexed by NodeId.
+    pub(crate) fn collector_current(&self, v: &[f64]) -> f64 {
+        let (x, y) = self.xy(v);
+        self.p * self.eval(x, y).ic
+    }
+}
+
+/// Node voltages indexed by NodeId (ground = 0) from the solved unknowns.
+fn nvec(x: &[f64], n: usize) -> Vec<f64> {
+    let mut v = vec![0.0; n];
+    v[1..].copy_from_slice(&x[..n - 1]);
+    v
+}
+
+pub(crate) fn bjts(c: &Circuit) -> Vec<BjtModel> {
+    c.parts.iter().filter_map(BjtModel::of).collect()
+}
+
+impl BjtModel {
+    /// Companion model at (x0, y0): terminal currents I_n ~ I_n0 + sum coef * (v_k - v_k0), coefs summing to zero.
+    fn stamp(&self, s: &mut Stamper, x0: f64, y0: f64, ev: &BjtEval) {
+        let nodes = [self.c, self.b, self.e];
+        let coef = |d: [f64; 2]| [-d[1], d[0] + d[1], -d[0]]; // wrt (vc, vb, ve)
+        let (cc, cb) = (coef(ev.dic), coef(ev.dib));
+        let ce = [-(cc[0] + cb[0]), -(cc[1] + cb[1]), -(cc[2] + cb[2])];
+        // Any point with the right junction voltages works because each row of coefs sums to zero.
+        let v0 = [-self.p * y0, 0.0, -self.p * x0];
+        let (ic0, ib0) = (self.p * ev.ic, self.p * ev.ib);
+        for (n, (co, i0)) in nodes.into_iter().zip([(cc, ic0), (cb, ib0), (ce, -(ic0 + ib0))]) {
+            for (k, g) in nodes.into_iter().zip(co) { s.transconductance(n, k, g); }
+            s.current(n, 0, i0 - co.iter().zip(v0).map(|(g, v)| g * v).sum::<f64>());
+        }
+        s.conductance(self.b, self.e, GMIN);
+        s.conductance(self.b, self.c, GMIN);
+    }
+}
+
+/// Newton-Raphson over the junctions and BJTs. `base` holds the linear stamps (and rhs); each iteration clones it,
 /// adds each junction's companion model and solves. `v0` = starting node voltages (index = NodeId).
 /// Converged when no node moves 1e-6 V or more and every junction's linearisation error is under
 /// 1e-9 A + 1e-9 * |I| (relative part keeps huge currents, e.g. a bare LED on 5 V, from failing on rounding).
-pub(crate) fn newton(base: &Stamper, js: &[Junction], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
+pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], v0: &[f64], max_iters: u32, cause: &str) -> Result<Vec<f64>, SimError> {
     let nv = |x: &[f64], i: u32| if i == 0 { 0.0 } else { x[i as usize - 1] };
     let mut prev = v0[1..].to_vec();
     let mut vj: Vec<f64> = js.iter().map(|j| v0[j.a as usize] - v0[j.k as usize]).collect();
+    let mut vq: Vec<(f64, f64)> = qs.iter().map(|q| q.xy(v0)).collect();
     for it in 1..=max_iters {
         let mut s = base.clone();
         let mut lin = Vec::with_capacity(js.len());
@@ -241,6 +322,12 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], v0: &[f64], max_iters: u32
             s.conductance(j.a, j.k, g + GMIN);
             s.current(j.a, j.k, ieq);
             lin.push((g, ieq));
+        }
+        let mut qlin = Vec::with_capacity(qs.len());
+        for (q, &(x0, y0)) in qs.iter().zip(&vq) {
+            let ev = q.eval(x0, y0);
+            q.stamp(&mut s, x0, y0, &ev);
+            qlin.push(ev);
         }
         let x = s.solve(cause)?;
         if x.iter().any(|v| !v.is_finite()) {
@@ -254,6 +341,14 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], v0: &[f64], max_iters: u32
             let i = shockley(v, j.nvt).0;
             resid_ok &= (i - (g * v + ieq)).abs() < 1e-9 + 1e-9 * i.abs();
             vj[idx] = pnjlim(v, vj[idx], j.nvt);
+        }
+        for (idx, q) in qs.iter().enumerate() {
+            let (xn, yn) = q.xy(&nvec(&x, v0.len()));
+            let (x0, y0) = vq[idx];
+            let (lin, ev) = (&qlin[idx], q.eval(xn, yn));
+            let (ic, ib) = (lin.ic + lin.dic[0] * (xn - x0) + lin.dic[1] * (yn - y0), lin.ib + lin.dib[0] * (xn - x0) + lin.dib[1] * (yn - y0));
+            resid_ok &= (ev.ic - ic).abs() < 1e-9 + 1e-9 * ev.ic.abs() && (ev.ib - ib).abs() < 1e-9 + 1e-9 * ev.ib.abs();
+            vq[idx] = (pnjlim(xn, x0, VT), pnjlim(yn, y0, VT));
         }
         if dv < 1e-6 && resid_ok {
             return Ok(x);

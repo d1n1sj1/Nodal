@@ -19,6 +19,7 @@ pub fn check_damage(c: &Circuit, r: &TransientResult) -> Vec<DamageWarning> {
         let (kind, peak, limit) = match p.kind {
             PartKind::Resistor { ohms, max_watts, .. } => (DamageKind::OverPower, peak(s, |i| i * i * ohms), max_watts),
             PartKind::Led { max_amps, .. } => (DamageKind::OverCurrent, peak(s, f64::abs), max_amps),
+            PartKind::Bjt { max_amps, .. } => (DamageKind::OverCurrent, peak(s, f64::abs), max_amps),
             _ => return None,
         };
         (peak > limit).then(|| DamageWarning { part_id: p.id.clone(), kind, peak, limit })

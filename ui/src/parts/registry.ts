@@ -27,6 +27,8 @@ export const partDefs: PartDef[] = [
   { id: 'diode', kind: 'Diode', name: 'Diode', symbol: S.DiodeSymbol, defaults: {} },
   { id: 'led', kind: 'Led', name: 'LED', symbol: S.LedSymbol, defaults: { max_amps: 0.02 } },
   { id: 'switch', kind: 'Switch', name: 'Switch', symbol: S.SwitchSymbol, defaults: { closed: 1 } }, // 1 = closed, 0 = open
+  { id: 'npn', kind: 'Bjt', name: 'NPN transistor', symbol: S.NpnSymbol, defaults: { beta: 100, max_amps: 0.1, pnp: 0 } },
+  { id: 'pnp', kind: 'Bjt', name: 'PNP transistor', symbol: S.PnpSymbol, defaults: { beta: 100, max_amps: 0.1, pnp: 1 } },
   { id: 'ground', kind: 'Ground', name: 'Ground', symbol: S.GroundSymbol, defaults: {} },
 ]
 

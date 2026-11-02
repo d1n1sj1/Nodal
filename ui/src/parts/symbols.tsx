@@ -14,4 +14,7 @@ export const ISourceSymbol = sym(<path d="M1 9h7M26 9h7M17 1a8 8 0 100 16 8 8 0 
 export const DiodeSymbol = sym(<path d="M1 9h12M21 9h12M13 2l8 7-8 7zM21 2v14" />)
 export const LedSymbol = sym(<path d="M1 9h10M21 9h12M11 3l8 6-8 6zM19 3v12M17 1l3-1M21 3l3-1" />)
 export const SwitchSymbol = sym(<path d="M1 12h9M24 12h9M10 12l12-8" />)
+// Pins: base left, collector top right, emitter bottom right (editor/schematic.ts pinPos).
+export const NpnSymbol = sym(<path d="M1 9h12M13 3v12M13 6l12-5h8M13 12l12 5h8M20 15.5l5 1.5-1.5-4.5" />)
+export const PnpSymbol = sym(<path d="M1 9h12M13 3v12M13 6l12-5h8M13 12l12 5h8M16.5 13.5l-3.5-1.5 1.5 4" />)
 export const GroundSymbol = sym(<path d="M17 1v6M9 7h16M12 11h10M15 15h4" />)

@@ -69,6 +69,11 @@ Rulings made during execution (the owner has not reviewed these; each says what 
 
 Done: wire routing around parts; `SimError::InvalidInput` for bad values/run settings/initial state (Singular now only means a singular matrix); `transient_from` rejects non-finite state; speed tests lock `set_dense_max`, diode now conducts (asserted), and a release test checks sparse is >3x faster than dense (0.007 s vs 0.178 s).
 
+## Roadmap progress (2026-11-02, uncommitted before this commit)
+
+- BJT (NPN/PNP) done: `PartKind::Bjt` (Ebers-Moll, Is 1e-14 A, reverse beta 1, no Early effect), Newton handles 3-terminal parts, current reported is into the collector (PNP negative), over-current damage on collector current. UI: two palette items, 3-pin symbol (pin 0 collector, 1 base, 2 emitter), beta and max-current editable. Tests: `crates/nodal-core/tests/bjt.rs`, `ui/src/editor/bjt.test.ts`.
+- Not done for BJT: Kids tile (falls back to the generic tile), real-window check, speed test with BJTs. Next: MOSFET, op-amps, AC analysis, SPICE import/export.
+
 ## Deferred minors (not fixed)
 
 - Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API;  Newton rebuilds the sparse ordering every iteration; the oversized-result test only asserts `is_err()`.

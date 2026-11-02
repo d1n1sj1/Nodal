@@ -1,4 +1,4 @@
-use crate::mna::{junctions, newton, Junction, Stamper, MAX_NEWTON_ITERS};
+use crate::mna::{bjts, junctions, newton, BjtModel, Junction, Stamper, MAX_NEWTON_ITERS};
 use crate::{Circuit, PartKind::*, SimError};
 use std::collections::HashMap;
 
@@ -6,7 +6,7 @@ use std::collections::HashMap;
 pub struct DcResult {
     /// index = NodeId.0, [0] = 0.0
     pub node_voltages: Vec<f64>,
-    /// by part id. Resistor/inductor/switch: a->b. VSource: pos->neg through the source. ISource: from->to. Diode/LED: anode->cathode.
+    /// by part id. Resistor/inductor/switch: a->b. VSource: pos->neg through the source. ISource: from->to. Diode/LED: anode->cathode. Bjt: current into the collector.
     pub part_currents: HashMap<String, f64>,
 }
 
@@ -21,6 +21,7 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
         let ok = match p.kind {
             Resistor { ohms, .. } => ohms.is_finite() && ohms > 0.0,
             Capacitor { farads: x, .. } | Inductor { henries: x, .. } | VSource { volts: x, .. } | ISource { amps: x, .. } => x.is_finite(),
+            Bjt { beta, .. } => beta.is_finite() && beta > 0.0,
             _ => true,
         };
         if !ok {
@@ -58,10 +59,12 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
         x
     }
     for p in &c.parts {
-        if matches!(p.kind, Resistor { .. } | Inductor { .. } | VSource { .. } | Diode { .. } | Led { .. } | Switch { closed: true, .. }) {
-            let [x, y] = p.nodes();
-            let (rx, ry) = (find(&mut uf, x as usize), find(&mut uf, y as usize));
-            uf[rx] = ry;
+        if matches!(p.kind, Resistor { .. } | Inductor { .. } | VSource { .. } | Diode { .. } | Led { .. } | Bjt { .. } | Switch { closed: true, .. }) {
+            let ns = p.nodes();
+            for &y in &ns[1..] {
+                let (rx, ry) = (find(&mut uf, ns[0] as usize), find(&mut uf, y as usize));
+                uf[rx] = ry;
+            }
         }
     }
     let g = find(&mut uf, 0);
@@ -85,12 +88,12 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
             VSource { pos, neg, volts } => s.voltage_source(k.unwrap(), pos.0, neg.0, volts),
             Inductor { a, b, .. } | Switch { a, b, closed: true } => s.voltage_source(k.unwrap(), a.0, b.0, 0.0),
             Switch { a, b, closed: false } => s.conductance(a.0, b.0, OPEN_SWITCH_SIEMENS),
-            Capacitor { .. } | Diode { .. } | Led { .. } => {} // open in DC / junctions stamped by newton
+            Capacitor { .. } | Diode { .. } | Led { .. } | Bjt { .. } => {} // open in DC / junctions stamped by newton
         }
     }
     let cause = "voltage sources in a loop or a source across a zero-ohm path";
-    let js = junctions(c);
-    let x = if js.is_empty() { s.solve(cause)? } else { newton(&s, &js, &vec![0.0; n], max_iters, cause)? };
+    let (js, qs) = (junctions(c), bjts(c));
+    let x = if js.is_empty() && qs.is_empty() { s.solve(cause)? } else { newton(&s, &js, &qs, &vec![0.0; n], max_iters, cause)? };
 
     let mut node_voltages = vec![0.0; n];
     node_voltages[1..].copy_from_slice(&x[..n - 1]);
@@ -103,6 +106,7 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
             Switch { a, b, closed: false } => (v(a) - v(b)) * OPEN_SWITCH_SIEMENS,
             VSource { .. } | Inductor { .. } | Switch { .. } => x[n - 1 + branch_of[p.id.as_str()]],
             Diode { .. } | Led { .. } => Junction::of(p).unwrap().current(&node_voltages),
+            Bjt { .. } => BjtModel::of(p).unwrap().collector_current(&node_voltages),
             Capacitor { .. } => 0.0,
         };
         part_currents.insert(p.id.clone(), i);

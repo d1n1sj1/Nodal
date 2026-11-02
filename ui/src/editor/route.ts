@@ -1,4 +1,4 @@
-import { PART_HALF_HEIGHT, PART_HALF_WIDTH, pinPos, type PlacedPart, type Pos } from './schematic'
+import { PART_HALF_HEIGHT, PART_HALF_WIDTH, pinDir, pinPos, type PlacedPart, type Pos } from './schematic'
 
 const GRID = 20
 const INSET = 2 // pins sit on the part box edge; shrink the box so they are not "inside" it
@@ -29,8 +29,8 @@ export function routeWire(parts: PlacedPart[], from: { part: string; pin: number
   const b = parts.find((p) => p.id === to.part)!
   const pa = pinPos(a, from.pin)
   const pb = pinPos(b, to.pin)
-  const da = a.def.kind === 'Ground' ? 0 : from.pin ? 1 : -1
-  const db = b.def.kind === 'Ground' ? 0 : to.pin ? 1 : -1
+  const da = pinDir(a, from.pin)
+  const db = pinDir(b, to.pin)
   const ea = pa.x + da * GRID
   const eb = pb.x + db * GRID
   const boxes = parts.map(boxOf)

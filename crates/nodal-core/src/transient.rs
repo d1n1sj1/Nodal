@@ -1,5 +1,5 @@
 use crate::dc::{dc_op, validate};
-use crate::mna::{junctions, newton, Junction, Stamper, MAX_NEWTON_ITERS};
+use crate::mna::{bjts, junctions, newton, BjtModel, Junction, Stamper, MAX_NEWTON_ITERS};
 use crate::{Circuit, NodeId, PartKind::*, SimError};
 use std::collections::HashMap;
 
@@ -38,7 +38,7 @@ const CAUSE: &str = "transient matrix is singular: voltage sources in a loop or 
 
 /// Trapezoidal integration, started from rest (capacitors 0 V, inductors 0 A, sources switch on at t = 0).
 /// Rest state is solved with dc_op on a copy where C is a 0 V source and L a 0 A source.
-/// Linear circuits factor the matrix once; circuits with diodes/LEDs run Newton at every step.
+/// Linear circuits factor the matrix once; circuits with diodes/LEDs/BJTs run Newton at every step.
 pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, SimError> {
     check_run(c, stop, step)?;
     let mut rest = c.clone();
@@ -115,14 +115,14 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                 s.voltage_source(k, a.0, b.0, 0.0);
                 s.branch_resistance(k, 2.0 * henries / step);
             }
-            Diode { .. } | Led { .. } => {} // stamped per Newton iteration
+            Diode { .. } | Led { .. } | Bjt { .. } => {} // stamped per Newton iteration
         }
     }
     let base = s.rhs.clone();
     let mut rhs = base.clone();
-    let js = junctions(c);
+    let (js, qs) = (junctions(c), bjts(c));
     // Linear fast path: factor once. Nonlinear: newton re-stamps from a clone of `s` every iteration.
-    let fast = if js.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
+    let fast = if js.is_empty() && qs.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
 
     // Per-part history: current through and voltage across (a - b) at the previous point.
     let mut ist: Vec<f64> = c.parts.iter().map(|p| init.part_currents[&p.id]).collect();
@@ -155,7 +155,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
             None => {
                 let mut st = s.clone();
                 st.rhs.copy_from_slice(&rhs);
-                newton(&st, &js, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
+                newton(&st, &js, &qs, node_voltages.last().unwrap(), MAX_NEWTON_ITERS, CAUSE)?
             }
         };
         let mut v = vec![0.0; n];
@@ -174,6 +174,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                     cur
                 }
                 Diode { .. } | Led { .. } => Junction::of(p).unwrap().current(&v),
+                Bjt { .. } => BjtModel::of(p).unwrap().collector_current(&v),
             };
             ist[i] = cur;
             currents[i].push(cur);
