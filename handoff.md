@@ -46,6 +46,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 - `v0.1.0` tag at `2d62a86`. `release.yml` ran green on all four jobs (Windows, Linux, macOS arm64, macOS x86_64) and made a draft release; CI is green on `main` and the tag. Asset names were not listed (the API hides drafts); check them in the Releases tab.
 - Release fixes made before tagging: Intel macOS build, `src-tauri/LICENSE.txt` (MIT + Apache) as `licenseFile`, actions pinned by SHA. The "Education" category passed the build.
+- `v0.2.0` tag at `3191a83` (version bumped to 0.2.0 in `tauri.conf.json` and both `Cargo.toml`). The first push at `2db3d4b` failed CI and Release: `tsc -b` (part of `npm run build --prefix ui`) rejects unused variables (TS6133) that `tsc --noEmit` does not flag. Fixed in `route.ts`, tag moved, Release and CI both green. The release is a draft; asset list unchecked (API hides drafts). Always run `npm run build --prefix ui` before pushing.
 
 ## Decisions
 
@@ -94,6 +95,6 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 ## Next steps
 
 1. Run the remaining owner checks above, plus a real-window Open/Save of a `.cir` file.
-2. Decide on a git remote and a first `v*` tag to exercise the release workflow.
+2. Publish the `v0.2.0` draft release (owner). Remote and release workflow are done.
 3. Triage the deferred minors.
 4. Roadmap done. SPICE import/export: `crates/nodal-core/src/spice.rs` (`to_spice`, `from_spice`), chosen by a `.cir`/`.sp` extension in `save_circuit`/`load_circuit`. Lossy by design: switches export as 1 mOhm / 1 GOhm resistors, op-amps as a VCVS `E` (vsat resets to 12 V on import), power and current ratings reset to defaults, part ids gain a type letter unless they already start with it (`p1` -> `Rp1`, `V1` stays `V1`; a name clash falls back to prefixing). Reads suffixes (k, meg, u...), `+` continuation, named nodes, `.model` NPN/PNP/NMOS/PMOS/D. Not read: subcircuits, `.param`, AC/SIN/PULSE sources, switches, `;` inline comments. Tests: `tests/spice.rs`, one in `src-tauri/tests/commands.rs`. Not window-checked.
