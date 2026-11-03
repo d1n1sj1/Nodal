@@ -27,7 +27,7 @@ Nodal has Kids mode and Engineer mode over the same circuit file.
 
 - Parts: resistor, capacitor, inductor, voltage source, current source, ground, diode, LED, switch, NPN/PNP transistor, N/P-MOSFET, op-amp.
 - Analyses: DC operating point, transient, AC sweep (Engineer mode).
-- Later: SPICE import/export.
+- SPICE netlists: Open and Save use `.cir` or `.sp` files. Reads R, C, L, V, I, D, Q, M, E and `.model`; other cards are ignored.
 
 ## Licence
 

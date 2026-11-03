@@ -1,5 +1,5 @@
 use nodal_app::commands::*;
-use nodal_core::DamageKind;
+use nodal_core::{Circuit, DamageKind};
 
 const BARE_LED: &str = r#"{"version":1,"parts":[
  {"id":"V1","kind":"VSource","pos":1,"neg":0,"volts":5.0},
@@ -43,6 +43,17 @@ fn save_then_load_roundtrips_and_save_rejects_garbage() {
     let bad = tmp("bad.json");
     assert!(save_circuit(bad.clone(), "garbage".into()).is_err());
     assert!(!std::path::Path::new(&bad).exists());
+}
+
+#[test]
+fn cir_extension_saves_and_loads_spice_text() {
+    let p = tmp("rt.cir");
+    save_circuit(p.clone(), BARE_LED.into()).unwrap();
+    let text = std::fs::read_to_string(&p).unwrap();
+    assert!(text.contains(".end") && !text.contains("\"kind\""));
+    let back = Circuit::from_json(&load_circuit(p.clone()).unwrap()).unwrap();
+    assert_eq!(back.parts.len(), Circuit::from_json(BARE_LED).unwrap().parts.len());
+    std::fs::remove_file(&p).ok();
 }
 
 #[test]

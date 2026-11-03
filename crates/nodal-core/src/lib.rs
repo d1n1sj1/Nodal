@@ -4,6 +4,7 @@ pub mod dc;
 mod error;
 pub mod mna;
 mod model;
+pub mod spice;
 pub mod transient;
 pub use damage::{check_damage, DamageKind, DamageWarning};
 pub use error::SimError;

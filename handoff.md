@@ -93,4 +93,4 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 1. Run the remaining owner checks above.
 2. Decide on a git remote and a first `v*` tag to exercise the release workflow.
 3. Triage the deferred minors.
-4. Later roadmap: transistors, op-amps, AC analysis, SPICE import/export.
+4. Roadmap done. SPICE import/export: `crates/nodal-core/src/spice.rs` (`to_spice`, `from_spice`), chosen by a `.cir`/`.sp` extension in `save_circuit`/`load_circuit`. Lossy by design: switches export as 1 mOhm / 1 GOhm resistors, op-amps as a VCVS `E` (vsat resets to 12 V on import), power and current ratings reset to defaults, part ids gain a type letter (`p1` -> `Rp1`). Reads suffixes (k, meg, u...), `+` continuation, named nodes, `.model` NPN/PNP/NMOS/PMOS/D. Not read: subcircuits, `.param`, AC/SIN/PULSE sources, switches, `;` inline comments. Tests: `tests/spice.rs`, one in `src-tauri/tests/commands.rs`. Not window-checked.

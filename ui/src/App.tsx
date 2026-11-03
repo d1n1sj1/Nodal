@@ -21,7 +21,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 import { loadCircuit, saveCircuit, type SimOutput } from './sim/api'
 import './modes/theme.css'
 
-const filters = [{ name: 'Nodal circuit', extensions: ['json'] }]
+const filters = [{ name: 'Nodal circuit', extensions: ['json'] }, { name: 'SPICE netlist', extensions: ['cir', 'sp'] }]
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 function App() {
