@@ -115,6 +115,19 @@ test('toggled_switch_builds_closed_false', () => {
   expect((buildCircuit(s).parts[0] as { closed: unknown }).closed).toBe(false)
 })
 
+test('kids_led_transistor_amplifier_build_core_parts', () => {
+  let s = addPart(addPart(addPart(emptySchematic(), kid('led'), at), kid('transistor'), at), kid('amplifier'), at)
+  s = addWire(s, { part: 'p1', pin: 1 }, { part: 'p2', pin: 0 }) // LED cathode -> collector
+  s = addWire(s, { part: 'p2', pin: 2 }, { part: 'p3', pin: 0 }) // emitter -> amp output
+  const [led, bjt, amp] = buildCircuit(s).parts as unknown as Record<string, unknown>[]
+  expect(led).toMatchObject({ kind: 'Led', max_amps: 0.02 })
+  expect(bjt).toMatchObject({ kind: 'Bjt', pnp: false, beta: 100 })
+  expect(amp).toMatchObject({ kind: 'Opamp', vsat: 12 })
+  expect(led.cathode).toBe(bjt.c)
+  expect(bjt.e).toBe(amp.out)
+  expect(new Set([bjt.c, bjt.b, bjt.e]).size).toBe(3) // unwired pins get their own nodes
+})
+
 test('kids_motor_keeps_builds_defaults', () => {
   const s = updateValues(addPart(emptySchematic(), kid('motor'), at), 'p1', { ohms: 1 })
   expect(buildCircuit(s).parts[0]).toMatchObject({ ohms: 50 })
