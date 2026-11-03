@@ -66,10 +66,11 @@ fn continuation_models_and_suffixes() {
 #[test]
 fn sine_and_pulse_sources_round_trip() {
     use nodal_core::Wave;
-    let text = "t\nV1 1 0 SIN(1 2 1k)\nV2 2 0 PULSE(0 5 0 1n 1n 0.5m 1m)\nR1 1 2 1k\n.end\n";
+    let text = "t\nV1 1 0 SIN(1 2 1k)\nV2 2 0 PULSE(0 5 0 1n 1n 0.5m 1m)\nV3 3 0 PULSE(0 1 0 0 0 0.2m 1m)\nR1 1 2 1k\n.end\n";
     let c = from_spice(text).unwrap();
     assert!(matches!(c.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Sine { amp, freq }), .. } if volts == 1.0 && amp == 2.0 && freq == 1000.0));
-    assert!(matches!(c.parts[1].kind, PartKind::VSource { volts, wave: Some(Wave::Square { amp, freq }), .. } if volts == 2.5 && amp == 2.5 && (freq - 1000.0).abs() < 1e-9));
+    assert!(matches!(c.parts[1].kind, PartKind::VSource { volts, wave: Some(Wave::Square { amp, freq, duty }), .. } if volts == 2.5 && amp == 2.5 && (freq - 1000.0).abs() < 1e-9 && (duty - 0.5).abs() < 1e-9));
+    assert!(matches!(c.parts[2].kind, PartKind::VSource { wave: Some(Wave::Square { duty, .. }), .. } if (duty - 0.2).abs() < 1e-9));
     assert_eq!(from_spice(&to_spice(&c)).unwrap().parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>(), c.parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>());
     assert!(from_spice("t\nV1 1 0 SIN(1 2)\nR1 1 0 1\n").is_err());
 }

@@ -26,19 +26,21 @@ pub enum PartKind {
     Bjt { c: NodeId, b: NodeId, e: NodeId, pnp: bool, beta: f64, max_amps: f64 },
 }
 
-/// Time-varying part of a voltage source, added to its `volts` offset. `amp` is the peak; a square wave is 50% duty, high first.
+/// Time-varying part of a voltage source, added to its `volts` offset. `amp` is the peak; a square wave is high for the first `duty` (0 to 1, default 0.5) of each period.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "shape")]
 pub enum Wave {
     Sine { amp: f64, freq: f64 },
-    Square { amp: f64, freq: f64 },
+    Square { amp: f64, freq: f64, #[serde(default = "half")] duty: f64 },
 }
+
+fn half() -> f64 { 0.5 }
 
 impl Wave {
     pub fn at(&self, offset: f64, t: f64) -> f64 {
         match *self {
             Wave::Sine { amp, freq } => offset + amp * (std::f64::consts::TAU * freq * t).sin(),
-            Wave::Square { amp, freq } => offset + if (t * freq).fract() < 0.5 { amp } else { -amp },
+            Wave::Square { amp, freq, duty } => offset + if (t * freq).fract() < duty { amp } else { -amp },
         }
     }
 }

@@ -23,7 +23,7 @@ export const partDefs: PartDef[] = [
   { id: 'capacitor', kind: 'Capacitor', name: 'Capacitor', symbol: S.CapacitorSymbol, defaults: { farads: 1e-6 } },
   { id: 'inductor', kind: 'Inductor', name: 'Inductor', symbol: S.InductorSymbol, defaults: { henries: 1e-3 } },
   { id: 'vsource', kind: 'VSource', name: 'Voltage source', symbol: S.VSourceSymbol, defaults: { volts: 5 } },
-  { id: 'signal', kind: 'VSource', name: 'Signal source', symbol: S.SignalSymbol, defaults: { volts: 0, amp: 1, freq: 1000, square: 0 } }, // sine (0) or square (1) on top of the offset
+  { id: 'signal', kind: 'VSource', name: 'Signal source', symbol: S.SignalSymbol, defaults: { volts: 0, amp: 1, freq: 1000, square: 0, duty: 0.5 } }, // sine (0) or square (1) on top of the offset
   { id: 'isource', kind: 'ISource', name: 'Current source', symbol: S.ISourceSymbol, defaults: { amps: 0.01 } },
   { id: 'diode', kind: 'Diode', name: 'Diode', symbol: S.DiodeSymbol, defaults: {} },
   { id: 'led', kind: 'Led', name: 'LED', symbol: S.LedSymbol, defaults: { max_amps: 0.02 } },

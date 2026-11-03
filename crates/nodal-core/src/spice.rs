@@ -46,7 +46,7 @@ pub fn to_spice(c: &Circuit) -> String {
                 let w = match wave {
                     None => format!("DC {volts:e}"),
                     Some(Wave::Sine { amp, freq }) => format!("SIN({volts:e} {amp:e} {freq:e})"),
-                    Some(Wave::Square { amp, freq }) => format!("PULSE({:e} {:e} 0 0 0 {:e} {:e})", volts - amp, volts + amp, 0.5 / freq, 1.0 / freq),
+                    Some(Wave::Square { amp, freq, duty }) => format!("PULSE({:e} {:e} 0 0 0 {:e} {:e})", volts - amp, volts + amp, duty / freq, 1.0 / freq),
                 };
                 out += &format!("{nm} {} {} {w}\n", pos.0, neg.0)
             }
@@ -130,8 +130,8 @@ pub fn from_spice(text: &str) -> Result<Circuit, SimError> {
                 let arg = |k: usize| num(u.get(k).ok_or_else(|| bad(*n, format!("{name} has too few waveform values")))?);
                 let (volts, wave) = match u[3].to_ascii_lowercase().as_str() {
                     "sin" => (arg(4)?, Some(Wave::Sine { amp: arg(5)?, freq: arg(6)? })),
-                    // shortcut: PULSE becomes a 50% duty square; delay, rise/fall and pulse width are dropped, upgrade when duty cycle is modelled
-                    "pulse" => { let (v1, v2) = (arg(4)?, arg(5)?); ((v1 + v2) / 2.0, Some(Wave::Square { amp: (v2 - v1) / 2.0, freq: 1.0 / arg(10)? })) }
+                    // shortcut: PULSE becomes an ideal square (duty = width / period); delay and rise/fall times are dropped, upgrade when they are modelled
+                    "pulse" => { let (v1, v2, per) = (arg(4)?, arg(5)?, arg(10)?); ((v1 + v2) / 2.0, Some(Wave::Square { amp: (v2 - v1) / 2.0, freq: 1.0 / per, duty: arg(9)? / per })) }
                     _ => (src()?, None),
                 };
                 PartKind::VSource { pos: node(t[1]), neg: node(t[2]), volts, wave }

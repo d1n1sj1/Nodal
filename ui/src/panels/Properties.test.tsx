@@ -4,7 +4,7 @@ import { afterEach, expect, test } from 'vitest'
 import { buildCircuit } from '../editor/buildCircuit'
 import { addPart, emptySchematic, updateValues, type Schematic } from '../editor/schematic'
 import type { Mode } from '../modes/mode'
-import { kidsPalette, type PartDef } from '../parts/registry'
+import { kidsPalette, partDefs, type PartDef } from '../parts/registry'
 import Properties from './Properties'
 
 afterEach(cleanup)
@@ -55,4 +55,16 @@ test('kids_switch_is_toggle_only_and_open_gives_closed_false', () => {
   expect(screen.getByRole('button', { name: 'Closed' }).getAttribute('aria-pressed')).toBe('true')
   fireEvent.click(open)
   expect(built().closed).toBe(false)
+})
+
+test('duty_cycle_shows_only_for_square_and_must_be_below_one', () => {
+  const signal = partDefs.find((d) => d.id === 'signal')!
+  setup(signal, 'engineer')
+  expect(screen.queryByLabelText(/Duty/)).toBeNull()
+  cleanup()
+  const built = setup({ ...signal, defaults: { ...signal.defaults, square: 1 } }, 'engineer')
+  fireEvent.change(screen.getByLabelText(/Duty/), { target: { value: '0.25' } })
+  expect(built().wave).toMatchObject({ shape: 'Square', duty: 0.25 })
+  fireEvent.change(screen.getByLabelText(/Duty/), { target: { value: '1' } })
+  expect(screen.getByRole('alert')).toBeTruthy()
 })

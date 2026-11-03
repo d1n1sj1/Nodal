@@ -86,11 +86,24 @@ fn sine_source_drives_a_resistor_divider() {
 fn square_source_flips_at_half_period_and_bad_freq_is_rejected() {
     use nodal_core::{SimError, Wave};
     let mk = |freq| Circuit { parts: vec![
-        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 0.0, wave: Some(Wave::Square { amp: 3.0, freq }) } },
+        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 0.0, wave: Some(Wave::Square { amp: 3.0, freq, duty: 0.5 }) } },
         Part { id: "R1".into(), kind: Resistor { a: NodeId(1), b: NodeId(0), ohms: 1000.0, max_watts: 1.0 } },
     ] };
     let r = transient(&mk(100.0), 0.01, 0.001).unwrap();
     assert_eq!(r.node_voltages[2][1].round(), 3.0); // t = 2 ms, first half
     assert_eq!(r.node_voltages[7][1].round(), -3.0); // t = 7 ms, second half
     assert!(matches!(transient(&mk(0.0), 0.01, 0.001), Err(SimError::InvalidInput(_))));
+}
+
+#[test]
+fn square_duty_sets_the_high_fraction() {
+    use nodal_core::{SimError, Wave};
+    let mk = |duty| Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 0.0, wave: Some(Wave::Square { amp: 1.0, freq: 100.0, duty }) }),
+        part("R1", Resistor { a: n(1), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
+    ] };
+    let r = transient(&mk(0.2), 0.01, 0.001).unwrap();
+    let high = r.node_voltages.iter().skip(1).take(10).filter(|v| v[1] > 0.0).count();
+    assert_eq!(high, 2); // 10 steps in one period, 20% high
+    for d in [0.0, 1.0] { assert!(matches!(transient(&mk(d), 0.01, 0.001), Err(SimError::InvalidInput(_)))); }
 }

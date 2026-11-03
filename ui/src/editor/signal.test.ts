@@ -18,10 +18,10 @@ function circuit(square: number) {
 test('signal_source_builds_a_wave_and_reloads_as_a_signal_source', () => {
   for (const [square, shape] of [[0, 'Sine'], [1, 'Square']] as const) {
     const c = buildCircuit(circuit(square))
-    expect(c.parts[0]).toEqual({ id: 'p1', kind: 'VSource', pos: 1, neg: 0, volts: 0, wave: { shape, amp: 1, freq: 1000 } })
+    expect(c.parts[0]).toEqual({ id: 'p1', kind: 'VSource', pos: 1, neg: 0, volts: 0, wave: shape === 'Square' ? { shape, amp: 1, freq: 1000, duty: 0.5 } : { shape, amp: 1, freq: 1000 } })
     const back = schematicFromCircuit(c).parts[0]
     expect(back.def.id).toBe('signal')
-    expect(back.values).toEqual({ volts: 0, amp: 1, freq: 1000, square })
+    expect(back.values).toEqual({ volts: 0, amp: 1, freq: 1000, square, duty: 0.5 })
   }
 })
 

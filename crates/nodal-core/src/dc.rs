@@ -21,7 +21,8 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
         let ok = match p.kind {
             Resistor { ohms, .. } => ohms.is_finite() && ohms > 0.0,
             Capacitor { farads: x, .. } | Inductor { henries: x, .. } | VSource { volts: x, wave: None, .. } | ISource { amps: x, .. } => x.is_finite(),
-            VSource { volts, wave: Some(Wave::Sine { amp, freq } | Wave::Square { amp, freq }), .. } => volts.is_finite() && amp.is_finite() && freq.is_finite() && freq > 0.0,
+            VSource { volts, wave: Some(Wave::Sine { amp, freq }), .. } => volts.is_finite() && amp.is_finite() && freq.is_finite() && freq > 0.0,
+            VSource { volts, wave: Some(Wave::Square { amp, freq, duty }), .. } => volts.is_finite() && amp.is_finite() && freq.is_finite() && freq > 0.0 && duty > 0.0 && duty < 1.0,
             Bjt { beta, .. } => beta.is_finite() && beta > 0.0,
             Opamp { gain, vsat, .. } => gain.is_finite() && gain > 0.0 && vsat.is_finite() && vsat > 0.0,
             Mosfet { vth, kp, .. } => vth.is_finite() && vth > 0.0 && kp.is_finite() && kp > 0.0,
