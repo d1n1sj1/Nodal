@@ -3,7 +3,7 @@ import { kidsPalette, partDefs, type PartDef } from './registry'
 import { tileFor } from './tiles'
 
 test('every_part_has_name_and_symbol', () => {
-  expect(partDefs).toHaveLength(14)
+  expect(partDefs).toHaveLength(15)
   for (const d of partDefs) {
     expect(d.name).toBeTruthy()
     expect(typeof d.symbol).toBe('function')

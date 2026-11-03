@@ -1,5 +1,5 @@
 use crate::mna::{bjts, junctions, mosfets, newton, opamps, BjtModel, Junction, MosModel, Stamper, MAX_NEWTON_ITERS};
-use crate::{Circuit, PartKind::*, SimError};
+use crate::{model::Wave, Circuit, PartKind::*, SimError};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -20,7 +20,8 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
     for p in &c.parts {
         let ok = match p.kind {
             Resistor { ohms, .. } => ohms.is_finite() && ohms > 0.0,
-            Capacitor { farads: x, .. } | Inductor { henries: x, .. } | VSource { volts: x, .. } | ISource { amps: x, .. } => x.is_finite(),
+            Capacitor { farads: x, .. } | Inductor { henries: x, .. } | VSource { volts: x, wave: None, .. } | ISource { amps: x, .. } => x.is_finite(),
+            VSource { volts, wave: Some(Wave::Sine { amp, freq } | Wave::Square { amp, freq }), .. } => volts.is_finite() && amp.is_finite() && freq.is_finite() && freq > 0.0,
             Bjt { beta, .. } => beta.is_finite() && beta > 0.0,
             Opamp { gain, vsat, .. } => gain.is_finite() && gain > 0.0 && vsat.is_finite() && vsat > 0.0,
             Mosfet { vth, kp, .. } => vth.is_finite() && vth > 0.0 && kp.is_finite() && kp > 0.0,
@@ -93,7 +94,7 @@ pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimErro
         match p.kind {
             Resistor { a, b, ohms, .. } => s.conductance(a.0, b.0, 1.0 / ohms),
             ISource { from, to, amps } => s.current(from.0, to.0, amps),
-            VSource { pos, neg, volts } => s.voltage_source(k.unwrap(), pos.0, neg.0, volts),
+            VSource { pos, neg, volts, .. } => s.voltage_source(k.unwrap(), pos.0, neg.0, volts),
             Inductor { a, b, .. } | Switch { a, b, closed: true } => s.voltage_source(k.unwrap(), a.0, b.0, 0.0),
             Switch { a, b, closed: false } => s.conductance(a.0, b.0, OPEN_SWITCH_SIEMENS),
             Opamp { out, .. } => s.voltage_source(k.unwrap(), out.0, 0, 0.0),

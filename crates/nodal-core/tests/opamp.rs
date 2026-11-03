@@ -9,7 +9,7 @@ fn amp(out: u32, plus: u32, minus: u32) -> Part { part("U1", Opamp { out: n(out)
 
 /// Inverting: Vin (node 1) -> 1k -> minus (2); 10k from out (3) to minus; plus at ground.
 fn inverting(vin: f64) -> Circuit {
-    Circuit { parts: vec![part("VIN", VSource { pos: n(1), neg: n(0), volts: vin }), res("R1", 1, 2, 1000.0), res("RF", 3, 2, 10e3), amp(3, 0, 2)] }
+    Circuit { parts: vec![part("VIN", VSource { pos: n(1), neg: n(0), volts: vin, wave: None }), res("R1", 1, 2, 1000.0), res("RF", 3, 2, 10e3), amp(3, 0, 2)] }
 }
 
 #[test]
@@ -27,17 +27,17 @@ fn output_saturates_at_the_limit() {
 
 #[test]
 fn follower_and_comparator() {
-    let f = Circuit { parts: vec![part("VIN", VSource { pos: n(1), neg: n(0), volts: 3.0 }), amp(2, 1, 2), res("RL", 2, 0, 1000.0)] };
+    let f = Circuit { parts: vec![part("VIN", VSource { pos: n(1), neg: n(0), volts: 3.0, wave: None }), amp(2, 1, 2), res("RL", 2, 0, 1000.0)] };
     assert!((dc_op(&f).unwrap().node_voltages[2] - 3.0).abs() < 1e-3);
     // Open loop, plus above minus: output pins at the positive limit.
-    let c = Circuit { parts: vec![part("VP", VSource { pos: n(1), neg: n(0), volts: 1.0 }), part("VM", VSource { pos: n(2), neg: n(0), volts: 0.5 }), amp(3, 1, 2), res("RL", 3, 0, 10e3)] };
+    let c = Circuit { parts: vec![part("VP", VSource { pos: n(1), neg: n(0), volts: 1.0, wave: None }), part("VM", VSource { pos: n(2), neg: n(0), volts: 0.5, wave: None }), amp(3, 1, 2), res("RL", 3, 0, 10e3)] };
     assert!((dc_op(&c).unwrap().node_voltages[3] - 12.0).abs() < 0.01);
 }
 
 #[test]
 fn opamp_transient_damage_and_validation() {
     // Follower driving 100 ohm at 3 V = 30 mA > 25 mA (negative: current flows out of the output pin).
-    let c = Circuit { parts: vec![part("VIN", VSource { pos: n(1), neg: n(0), volts: 3.0 }), amp(2, 1, 2), res("RL", 2, 0, 100.0)] };
+    let c = Circuit { parts: vec![part("VIN", VSource { pos: n(1), neg: n(0), volts: 3.0, wave: None }), amp(2, 1, 2), res("RL", 2, 0, 100.0)] };
     let t = transient(&c, 1e-3, 1e-4).unwrap();
     assert!((t.part_currents["U1"].last().unwrap() + 0.03).abs() < 1e-4);
     let w = check_damage(&c, &t);
@@ -56,7 +56,7 @@ fn opamp_json_roundtrip() {
 /// Inverting Schmitt trigger: Vin (node 1) on minus; out (2) fed back to plus (3) through a 10k/10k divider.
 fn schmitt(vin: f64) -> Circuit {
     Circuit { parts: vec![
-        part("VIN", VSource { pos: n(1), neg: n(0), volts: vin }),
+        part("VIN", VSource { pos: n(1), neg: n(0), volts: vin, wave: None }),
         res("R1", 2, 3, 10e3), res("R2", 3, 0, 10e3), res("RL", 2, 0, 10e3),
         amp(2, 3, 1),
     ]}

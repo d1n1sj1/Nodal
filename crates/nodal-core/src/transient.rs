@@ -44,7 +44,7 @@ pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, S
     let mut rest = c.clone();
     for p in &mut rest.parts {
         match p.kind {
-            Capacitor { a, b, .. } => p.kind = VSource { pos: a, neg: b, volts: 0.0 },
+            Capacitor { a, b, .. } => p.kind = VSource { pos: a, neg: b, volts: 0.0, wave: None },
             Inductor { a, b, .. } => p.kind = ISource { from: a, to: b, amps: 0.0 },
             _ => {}
         }
@@ -106,7 +106,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
         match p.kind {
             Resistor { a, b, ohms, .. } => s.conductance(a.0, b.0, 1.0 / ohms),
             ISource { from, to, amps } => s.current(from.0, to.0, amps),
-            VSource { pos, neg, volts } => s.voltage_source(branch_of[p.id.as_str()], pos.0, neg.0, volts),
+            VSource { pos, neg, volts, .. } => s.voltage_source(branch_of[p.id.as_str()], pos.0, neg.0, volts),
             Switch { a, b, closed: true } => s.voltage_source(branch_of[p.id.as_str()], a.0, b.0, 0.0),
             Switch { a, b, closed: false } => s.conductance(a.0, b.0, OPEN_SWITCH_SIEMENS),
             Capacitor { a, b, farads } => s.conductance(a.0, b.0, 2.0 * farads / step),
@@ -148,6 +148,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
                     if a.0 != 0 { rhs[a.0 as usize - 1] += hist; }
                     if b.0 != 0 { rhs[b.0 as usize - 1] -= hist; }
                 }
+                VSource { volts, wave: Some(w), .. } => rhs[rows[i]] = w.at(volts, k as f64 * step),
                 Inductor { henries, .. } => rhs[rows[i]] = -(2.0 * henries / step * ist[i] + vst[i]),
                 _ => {}
             }

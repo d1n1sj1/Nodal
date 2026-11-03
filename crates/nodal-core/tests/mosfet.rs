@@ -8,9 +8,9 @@ fn part(id: &str, kind: PartKind) -> Part { Part { id: id.into(), kind } }
 /// Common source: VDD 10 V -> 1k -> drain (node 2); gate (node 3) driven by `vg`; source at ground.
 fn nmos(vg: f64, kp: f64, max_amps: f64) -> Circuit {
     Circuit { parts: vec![
-        part("VDD", VSource { pos: n(1), neg: n(0), volts: 10.0 }),
+        part("VDD", VSource { pos: n(1), neg: n(0), volts: 10.0, wave: None }),
         part("RD", Resistor { a: n(1), b: n(2), ohms: 1000.0, max_watts: 10.0 }),
-        part("VG", VSource { pos: n(3), neg: n(0), volts: vg }),
+        part("VG", VSource { pos: n(3), neg: n(0), volts: vg, wave: None }),
         part("M1", Mosfet { d: n(2), g: n(3), s: n(0), pmos: false, vth: 2.0, kp, max_amps }),
     ]}
 }
@@ -37,8 +37,8 @@ fn nmos_triode_and_cutoff() {
 fn pmos_mirrors_nmos() {
     // Source at 10 V, gate at 6 V (Vsg = 4), drain through 1k to ground.
     let c = Circuit { parts: vec![
-        part("VDD", VSource { pos: n(1), neg: n(0), volts: 10.0 }),
-        part("VG", VSource { pos: n(3), neg: n(0), volts: 6.0 }),
+        part("VDD", VSource { pos: n(1), neg: n(0), volts: 10.0, wave: None }),
+        part("VG", VSource { pos: n(3), neg: n(0), volts: 6.0, wave: None }),
         part("RD", Resistor { a: n(2), b: n(0), ohms: 1000.0, max_watts: 10.0 }),
         part("M1", Mosfet { d: n(2), g: n(3), s: n(1), pmos: true, vth: 2.0, kp: 0.002, max_amps: 1.0 }),
     ]};

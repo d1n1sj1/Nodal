@@ -1,6 +1,6 @@
 //! SPICE netlist text <-> Circuit. Covers R C L V I D Q M E and `.model`; other cards are ignored.
 use crate::error::SimError;
-use crate::model::{Circuit, NodeId, Part, PartKind};
+use crate::model::{Circuit, NodeId, Part, PartKind, Wave};
 use std::collections::HashMap;
 
 fn bad(line: usize, msg: impl std::fmt::Display) -> SimError {
@@ -33,7 +33,14 @@ pub fn to_spice(c: &Circuit) -> String {
             Resistor { a, b, ohms, .. } => out += &format!("R{id} {} {} {ohms:e}\n", a.0, b.0),
             Capacitor { a, b, farads } => out += &format!("C{id} {} {} {farads:e}\n", a.0, b.0),
             Inductor { a, b, henries } => out += &format!("L{id} {} {} {henries:e}\n", a.0, b.0),
-            VSource { pos, neg, volts } => out += &format!("V{id} {} {} DC {volts:e}\n", pos.0, neg.0),
+            VSource { pos, neg, volts, wave } => {
+                let w = match wave {
+                    None => format!("DC {volts:e}"),
+                    Some(Wave::Sine { amp, freq }) => format!("SIN({volts:e} {amp:e} {freq:e})"),
+                    Some(Wave::Square { amp, freq }) => format!("PULSE({:e} {:e} 0 0 0 {:e} {:e})", volts - amp, volts + amp, 0.5 / freq, 1.0 / freq),
+                };
+                out += &format!("V{id} {} {} {w}\n", pos.0, neg.0)
+            }
             ISource { from, to, amps } => out += &format!("I{id} {} {} DC {amps:e}\n", from.0, to.0),
             Diode { anode, cathode } => out += &format!("D{id} {} {} DIODE\n", anode.0, cathode.0),
             Led { anode, cathode, .. } => out += &format!("D{id} {} {} LED\n", anode.0, cathode.0),
@@ -108,7 +115,18 @@ pub fn from_spice(text: &str) -> Result<Circuit, SimError> {
                     _ => PartKind::Inductor { a, b, henries: v },
                 }
             }
-            'V' => { need(4)?; PartKind::VSource { pos: node(t[1]), neg: node(t[2]), volts: src()? } }
+            'V' => {
+                need(4)?;
+                let u: Vec<&str> = l.split(['(', ')', ' ', '\t']).filter(|s| !s.is_empty()).collect();
+                let arg = |k: usize| num(u.get(k).ok_or_else(|| bad(*n, format!("{name} has too few waveform values")))?);
+                let (volts, wave) = match u[3].to_ascii_lowercase().as_str() {
+                    "sin" => (arg(4)?, Some(Wave::Sine { amp: arg(5)?, freq: arg(6)? })),
+                    // shortcut: PULSE becomes a 50% duty square; delay, rise/fall and pulse width are dropped, upgrade when duty cycle is modelled
+                    "pulse" => { let (v1, v2) = (arg(4)?, arg(5)?); ((v1 + v2) / 2.0, Some(Wave::Square { amp: (v2 - v1) / 2.0, freq: 1.0 / arg(10)? })) }
+                    _ => (src()?, None),
+                };
+                PartKind::VSource { pos: node(t[1]), neg: node(t[2]), volts, wave }
+            }
             'I' => { need(4)?; PartKind::ISource { from: node(t[1]), to: node(t[2]), amps: src()? } }
             'D' => {
                 need(4)?;

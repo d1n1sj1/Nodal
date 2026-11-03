@@ -6,7 +6,7 @@ use nodal_core::{Circuit, NodeId, Part, PartKind, PartKind::*, SimError};
 fn n(i: u32) -> NodeId { NodeId(i) }
 fn part(id: &str, kind: PartKind) -> Part { Part { id: id.into(), kind } }
 fn res(id: &str, a: u32, b: u32, ohms: f64) -> Part { part(id, Resistor { a: n(a), b: n(b), ohms, max_watts: 10.0 }) }
-fn vs(id: &str, pos: u32, volts: f64) -> Part { part(id, VSource { pos: n(pos), neg: n(0), volts }) }
+fn vs(id: &str, pos: u32, volts: f64) -> Part { part(id, VSource { pos: n(pos), neg: n(0), volts, wave: None }) }
 
 /// Index of the sweep point closest to `f`.
 fn at(r: &nodal_core::ac::AcResult, f: f64) -> usize {

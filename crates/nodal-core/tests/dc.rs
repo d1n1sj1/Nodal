@@ -11,7 +11,7 @@ fn r(id: &str, a: u32, b: u32) -> Part {
     p(id, Resistor { a: n(a), b: n(b), ohms: 1000.0, max_watts: 0.25 })
 }
 fn v(id: &str, pos: u32, volts: f64) -> Part {
-    p(id, VSource { pos: n(pos), neg: n(0), volts })
+    p(id, VSource { pos: n(pos), neg: n(0), volts, wave: None })
 }
 
 #[test]

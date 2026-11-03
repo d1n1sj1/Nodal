@@ -6,7 +6,7 @@ fn sample() -> Circuit {
         Part { id: "R1".into(), kind: PartKind::Resistor { a: n(1), b: n(2), ohms: 100.0, max_watts: 0.25 } },
         Part { id: "C1".into(), kind: PartKind::Capacitor { a: n(2), b: n(0), farads: 1e-6 } },
         Part { id: "L1".into(), kind: PartKind::Inductor { a: n(2), b: n(3), henries: 1e-3 } },
-        Part { id: "V1".into(), kind: PartKind::VSource { pos: n(1), neg: n(0), volts: 5.0 } },
+        Part { id: "V1".into(), kind: PartKind::VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None } },
         Part { id: "I1".into(), kind: PartKind::ISource { from: n(3), to: n(0), amps: 0.01 } },
         Part { id: "D1".into(), kind: PartKind::Diode { anode: n(3), cathode: n(0) } },
         Part { id: "LED1".into(), kind: PartKind::Led { anode: n(3), cathode: n(0), max_amps: 0.02 } },

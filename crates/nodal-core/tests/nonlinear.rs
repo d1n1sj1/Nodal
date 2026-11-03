@@ -9,7 +9,7 @@ fn part(id: &str, kind: PartKind) -> Part { Part { id: id.into(), kind } }
 fn series(volts: f64, reversed: bool) -> Circuit {
     let (anode, cathode) = if reversed { (n(0), n(2)) } else { (n(2), n(0)) };
     Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts, wave: None }),
         part("R1", Resistor { a: n(1), b: n(2), ohms: 1000.0, max_watts: 1.0 }),
         part("D1", Diode { anode, cathode }),
     ]}
@@ -56,7 +56,7 @@ fn nonconvergence_returns_error() {
 
 fn bare(volts: f64, led: bool) -> Circuit {
     let kind = if led { Led { anode: n(1), cathode: n(0), max_amps: 0.02 } } else { Diode { anode: n(1), cathode: n(0) } };
-    Circuit { parts: vec![part("V1", VSource { pos: n(1), neg: n(0), volts }), part("D1", kind)] }
+    Circuit { parts: vec![part("V1", VSource { pos: n(1), neg: n(0), volts, wave: None }), part("D1", kind)] }
 }
 
 fn assert_huge_finite(c: &Circuit) {
@@ -95,8 +95,8 @@ fn led_with_330_ohm_is_about_10_ma() {
 #[test]
 fn source_loop_still_singular() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
-        part("V2", VSource { pos: n(1), neg: n(0), volts: 3.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
+        part("V2", VSource { pos: n(1), neg: n(0), volts: 3.0, wave: None }),
         part("D1", Diode { anode: n(1), cathode: n(0) }),
     ]};
     assert!(matches!(dc_op(&c), Err(SimError::Singular(_))));
@@ -106,7 +106,7 @@ fn source_loop_still_singular() {
 fn diode_blocks_reverse_step_in_transient() {
     // Source at node 1, diode 1->2, 1 kΩ load 2->0.
     let circuit = |volts| Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts, wave: None }),
         part("D1", Diode { anode: n(1), cathode: n(2) }),
         part("R1", Resistor { a: n(2), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
     ]};

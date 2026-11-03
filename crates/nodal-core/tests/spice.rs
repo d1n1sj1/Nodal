@@ -10,7 +10,7 @@ fn every_part_roundtrips_through_spice() {
         part("1", PartKind::Resistor { a: n(1), b: n(2), ohms: 4700.0, max_watts: 0.25 }),
         part("2", PartKind::Capacitor { a: n(2), b: n(0), farads: 1e-6 }),
         part("3", PartKind::Inductor { a: n(2), b: n(3), henries: 1e-3 }),
-        part("4", PartKind::VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("4", PartKind::VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("5", PartKind::ISource { from: n(3), to: n(0), amps: 0.01 }),
         part("6", PartKind::Diode { anode: n(3), cathode: n(0) }),
         part("7", PartKind::Led { anode: n(3), cathode: n(0), max_amps: 0.02 }),
@@ -39,7 +39,7 @@ R2 out gnd 2.2K
 .op
 .end
 ").unwrap();
-    assert_eq!(c.parts[0].kind, PartKind::VSource { pos: n(1), neg: n(0), volts: 10.0 });
+    assert_eq!(c.parts[0].kind, PartKind::VSource { pos: n(1), neg: n(0), volts: 10.0, wave: None });
     assert_eq!(c.parts[2].kind, PartKind::Resistor { a: n(2), b: n(0), ohms: 2200.0, max_watts: 0.25 });
 }
 
@@ -61,4 +61,15 @@ fn continuation_models_and_suffixes() {
     assert_eq!(c.parts[1].kind, PartKind::Resistor { a: n(1), b: n(2), ohms: 1e6, max_watts: 0.25 });
     assert!(matches!(c.parts[2].kind, PartKind::Capacitor { farads, .. } if (farads - 1e-5).abs() < 1e-18));
     assert!(matches!(c.parts[3].kind, PartKind::Bjt { beta, pnp: false, .. } if beta == 50.0));
+}
+
+#[test]
+fn sine_and_pulse_sources_round_trip() {
+    use nodal_core::Wave;
+    let text = "t\nV1 1 0 SIN(1 2 1k)\nV2 2 0 PULSE(0 5 0 1n 1n 0.5m 1m)\nR1 1 2 1k\n.end\n";
+    let c = from_spice(text).unwrap();
+    assert!(matches!(c.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Sine { amp, freq }), .. } if volts == 1.0 && amp == 2.0 && freq == 1000.0));
+    assert!(matches!(c.parts[1].kind, PartKind::VSource { volts, wave: Some(Wave::Square { amp, freq }), .. } if volts == 2.5 && amp == 2.5 && (freq - 1000.0).abs() < 1e-9));
+    assert_eq!(from_spice(&to_spice(&c)).unwrap().parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>(), c.parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>());
+    assert!(from_spice("t\nV1 1 0 SIN(1 2)\nR1 1 0 1\n").is_err());
 }

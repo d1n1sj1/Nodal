@@ -8,9 +8,9 @@ fn part(id: &str, kind: PartKind) -> Part { Part { id: id.into(), kind } }
 /// Common emitter: Vcc 10 V -> 1k -> collector (node 2); Vbb -> rb -> base (node 3); emitter at ground.
 fn npn(vbb: f64, rb: f64, beta: f64, max_amps: f64) -> Circuit {
     Circuit { parts: vec![
-        part("VCC", VSource { pos: n(1), neg: n(0), volts: 10.0 }),
+        part("VCC", VSource { pos: n(1), neg: n(0), volts: 10.0, wave: None }),
         part("RC", Resistor { a: n(1), b: n(2), ohms: 1000.0, max_watts: 10.0 }),
-        part("VBB", VSource { pos: n(4), neg: n(0), volts: vbb }),
+        part("VBB", VSource { pos: n(4), neg: n(0), volts: vbb, wave: None }),
         part("RB", Resistor { a: n(4), b: n(3), ohms: rb, max_watts: 10.0 }),
         part("Q1", Bjt { c: n(2), b: n(3), e: n(0), pnp: false, beta, max_amps }),
     ]}
@@ -41,8 +41,8 @@ fn npn_cutoff_and_saturation() {
 fn pnp_mirrors_npn() {
     // Emitter at +10 V, collector through 1k to ground, base pulled to (10 - 5) V through 100k.
     let c = Circuit { parts: vec![
-        part("VCC", VSource { pos: n(1), neg: n(0), volts: 10.0 }),
-        part("VBB", VSource { pos: n(4), neg: n(0), volts: 5.0 }),
+        part("VCC", VSource { pos: n(1), neg: n(0), volts: 10.0, wave: None }),
+        part("VBB", VSource { pos: n(4), neg: n(0), volts: 5.0, wave: None }),
         part("RB", Resistor { a: n(3), b: n(4), ohms: 100e3, max_watts: 10.0 }),
         part("RC", Resistor { a: n(2), b: n(0), ohms: 1000.0, max_watts: 10.0 }),
         part("Q1", Bjt { c: n(2), b: n(3), e: n(1), pnp: true, beta: 100.0, max_amps: 1.0 }),

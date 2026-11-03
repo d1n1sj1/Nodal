@@ -8,7 +8,7 @@ fn at(times: &[f64], t: f64) -> usize { times.iter().position(|&x| (x - t).abs()
 #[test]
 fn rc_charging_matches_analytic() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("R1", Resistor { a: n(1), b: n(2), ohms: 1000.0, max_watts: 1.0 }),
         part("C1", Capacitor { a: n(2), b: n(0), farads: 1e-6 }),
     ]};
@@ -23,7 +23,7 @@ fn rc_charging_matches_analytic() {
 #[test]
 fn rl_current_rise_matches_analytic() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("R1", Resistor { a: n(1), b: n(2), ohms: 100.0, max_watts: 1.0 }),
         part("L1", Inductor { a: n(2), b: n(0), henries: 10e-3 }),
     ]};
@@ -35,7 +35,7 @@ fn rl_current_rise_matches_analytic() {
 
 fn switch_circuit(closed: bool) -> Circuit {
     Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("S1", Switch { a: n(1), b: n(2), closed }),
         part("R1", Resistor { a: n(2), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
     ]}
@@ -67,4 +67,30 @@ fn step_must_be_positive() {
     assert!(transient(&c, 0.0, 1e-4).is_err());
     assert!(transient(&c, f64::NAN, 1e-4).is_err());
     assert!(transient(&c, 1e6, 1e-6).is_err()); // > 10 million steps
+}
+
+#[test]
+fn sine_source_drives_a_resistor_divider() {
+    use nodal_core::Wave;
+    let c = Circuit { parts: vec![
+        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 1.0, wave: Some(Wave::Sine { amp: 2.0, freq: 100.0 }) } },
+        Part { id: "R1".into(), kind: Resistor { a: NodeId(1), b: NodeId(0), ohms: 1000.0, max_watts: 1.0 } },
+    ] };
+    let r = transient(&c, 0.01, 0.0001).unwrap();
+    for (t, v) in r.times.iter().zip(&r.node_voltages) {
+        if *t > 0.0 { assert!((v[1] - (1.0 + 2.0 * (std::f64::consts::TAU * 100.0 * t).sin())).abs() < 1e-9, "t={t} v={}", v[1]); }
+    }
+}
+
+#[test]
+fn square_source_flips_at_half_period_and_bad_freq_is_rejected() {
+    use nodal_core::{SimError, Wave};
+    let mk = |freq| Circuit { parts: vec![
+        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 0.0, wave: Some(Wave::Square { amp: 3.0, freq }) } },
+        Part { id: "R1".into(), kind: Resistor { a: NodeId(1), b: NodeId(0), ohms: 1000.0, max_watts: 1.0 } },
+    ] };
+    let r = transient(&mk(100.0), 0.01, 0.001).unwrap();
+    assert_eq!(r.node_voltages[2][1].round(), 3.0); // t = 2 ms, first half
+    assert_eq!(r.node_voltages[7][1].round(), -3.0); // t = 7 ms, second half
+    assert!(matches!(transient(&mk(0.0), 0.01, 0.001), Err(SimError::InvalidInput(_))));
 }

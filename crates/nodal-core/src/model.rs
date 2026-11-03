@@ -10,7 +10,8 @@ pub enum PartKind {
     Resistor { a: NodeId, b: NodeId, ohms: f64, max_watts: f64 },
     Capacitor { a: NodeId, b: NodeId, farads: f64 },
     Inductor { a: NodeId, b: NodeId, henries: f64 },
-    VSource { pos: NodeId, neg: NodeId, volts: f64 },
+    /// `volts` is the DC value, or the offset when `wave` is set (transient only: DC and AC analysis see `volts`).
+    VSource { pos: NodeId, neg: NodeId, volts: f64, #[serde(default, skip_serializing_if = "Option::is_none")] wave: Option<Wave> },
     ISource { from: NodeId, to: NodeId, amps: f64 },
     Diode { anode: NodeId, cathode: NodeId },
     Led { anode: NodeId, cathode: NodeId, max_amps: f64 },
@@ -23,6 +24,23 @@ pub enum PartKind {
     Opamp { out: NodeId, plus: NodeId, minus: NodeId, gain: f64, vsat: f64, max_amps: f64 },
     /// Ebers-Moll transistor (Is = 1e-14 A, reverse beta 1). `beta` = forward current gain; `max_amps` = collector current limit.
     Bjt { c: NodeId, b: NodeId, e: NodeId, pnp: bool, beta: f64, max_amps: f64 },
+}
+
+/// Time-varying part of a voltage source, added to its `volts` offset. `amp` is the peak; a square wave is 50% duty, high first.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "shape")]
+pub enum Wave {
+    Sine { amp: f64, freq: f64 },
+    Square { amp: f64, freq: f64 },
+}
+
+impl Wave {
+    pub fn at(&self, offset: f64, t: f64) -> f64 {
+        match *self {
+            Wave::Sine { amp, freq } => offset + amp * (std::f64::consts::TAU * freq * t).sin(),
+            Wave::Square { amp, freq } => offset + if (t * freq).fract() < 0.5 { amp } else { -amp },
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

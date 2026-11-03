@@ -7,11 +7,11 @@ import { formatSI, parseSI } from './formatSI'
 const LABELS: Record<string, string> = {
   ohms: 'Resistance (Ω)', max_watts: 'Max power (W)', farads: 'Capacitance (F)', henries: 'Inductance (H)',
   volts: 'Voltage (V)', amps: 'Current (A)', max_amps: 'Max current (A)', beta: 'Current gain (β)',
-  vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)', gain: 'Gain (V/V)', vsat: 'Output limit (V)',
+  amp: 'Amplitude (V)', freq: 'Frequency (Hz)', vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)', gain: 'Gain (V/V)', vsat: 'Output limit (V)',
 }
 const KIDS_LABELS: Record<string, string> = {
   ohms: 'resistance (ohms)', max_watts: 'power limit (watts)', farads: 'farads', henries: 'henries',
-  volts: 'volts', amps: 'amps', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength', gain: 'gain', vsat: 'output limit (volts)',
+  volts: 'volts', amps: 'amps', amp: 'swing (volts)', freq: 'beats per second', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength', gain: 'gain', vsat: 'output limit (volts)',
 }
 const SIGNED = ['volts', 'amps'] // sources may be negative or zero; every other value must be > 0
 const valid = (k: string, v: number) => Number.isFinite(v) && (SIGNED.includes(k) || v > 0)
@@ -27,7 +27,7 @@ export default function Properties({ part, mode, onChange }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const name = kids ? tileFor(part.def).name : part.def.name
   // multi-part kids items (motor) build from fixed defaults, so there is nothing to edit
-  const keys = part.def.builds && part.def.builds.length > 1 ? [] : Object.keys(part.def.defaults).filter((k) => k !== 'closed' && k !== 'pnp' && k !== 'pmos')
+  const keys = part.def.builds && part.def.builds.length > 1 ? [] : Object.keys(part.def.defaults).filter((k) => k !== 'closed' && k !== 'pnp' && k !== 'pmos' && k !== 'square')
   const isSwitch = part.def.kind === 'Switch'
   if (!keys.length && !isSwitch) return null
 
@@ -43,6 +43,7 @@ export default function Properties({ part, mode, onChange }: Props) {
     return SIGNED.includes(k) ? `${LABELS[k] ?? k}: enter a number like 5, -2.5 or 500m.` : `${LABELS[k] ?? k}: enter a number above zero, like 1k or 4.7u.`
   }
   const closed = part.values.closed !== 0
+  const square = part.values.square === 1
 
   return (
     <section className="properties" aria-label={`${name} properties`}>
@@ -65,6 +66,12 @@ export default function Properties({ part, mode, onChange }: Props) {
         <div className="mode-switch" role="group" aria-label={`${name} position`}>
           <button type="button" aria-pressed={!closed} onClick={() => onChange({ closed: 0 })}>Open</button>
           <button type="button" aria-pressed={closed} onClick={() => onChange({ closed: 1 })}>Closed</button>
+        </div>
+      )}
+      {'square' in part.def.defaults && (
+        <div className="mode-switch" role="group" aria-label={`${name} shape`}>
+          <button type="button" aria-pressed={!square} onClick={() => onChange({ square: 0 })}>Sine</button>
+          <button type="button" aria-pressed={square} onClick={() => onChange({ square: 1 })}>Square</button>
         </div>
       )}
     </section>

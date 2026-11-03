@@ -11,7 +11,7 @@ fn led() -> nodal_core::PartKind { Led { anode: n(2), cathode: n(0), max_amps: 0
 #[test]
 fn led_without_resistor_warns() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("D1", Led { anode: n(1), cathode: n(0), max_amps: 0.02 }),
     ]};
     let w = warns(&c);
@@ -23,7 +23,7 @@ fn led_without_resistor_warns() {
 #[test]
 fn led_with_330_ohm_is_fine() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("R1", Resistor { a: n(1), b: n(2), ohms: 330.0, max_watts: 0.25 }),
         part("D1", led()),
     ]};
@@ -33,7 +33,7 @@ fn led_with_330_ohm_is_fine() {
 #[test]
 fn resistor_over_rating_warns() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 12.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 12.0, wave: None }),
         part("R1", Resistor { a: n(1), b: n(0), ohms: 100.0, max_watts: 0.25 }),
     ]};
     let w = warns(&c);
@@ -45,7 +45,7 @@ fn resistor_over_rating_warns() {
 #[test]
 fn no_warnings_when_within_limits() {
     let c = Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0 }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
         part("R1", Resistor { a: n(1), b: n(0), ohms: 1000.0, max_watts: 0.25 }),
     ]};
     assert_eq!(warns(&c), vec![]);
