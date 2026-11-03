@@ -38,8 +38,8 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 ## Still for the owner
 
 - Owner checks done 2026-11-01 ("everything is fine"): kids tile artwork, wording, contrast colours, close prompt, RC curve on the scope.
-- Publish the draft release `v0.1.0` (Releases tab, only visible to the owner) when happy with it.
-- Wire routing (`ui/src/editor/route.ts`) avoids parts but not other wires. Checked in a browser against the Vite server (wire dips under a part in its way), not in the Tauri window.
+- `v0.1.0` published by the owner.
+- Wire routing (`ui/src/editor/route.ts`) avoids parts, and `routeAll` makes later wires avoid running along earlier wires of other nets (2026-11-03). Not checked in the Tauri window.
 - Installers are unsigned, so macOS and Windows will warn (SmartScreen: More info, Run anyway).
 
 ## Release
@@ -79,12 +79,12 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 - Speed with active parts (`cargo test --release -p nodal-core --test speed`, 1,000 nodes, 1,000 steps): NPN 0.91 s, N-MOSFET 0.87 s, op-amp 0.93 s, diode 0.90 s. Fixed the same day: the COLAMD column order is now cached (`ColOrder`, `Stamper::factor_cached`) across Newton iterations and transient steps, giving about 0.2 s for each (NPN 0.21, N-MOSFET 0.20-0.26, op-amp 0.21-0.38, diode 0.21-0.26), linear ladder 0.04 s.
 - AC analysis done: `nodal_core::ac::ac_sweep(circuit, source_id, f_start, f_stop, points_per_decade)` solves the DC operating point, linearises diodes, LEDs, BJTs, MOSFETs and op-amps around it (`mna::linearize`), then solves a complex system per frequency with the chosen voltage source as a 1 V stimulus (other sources zero, current sources open). Returns magnitude (volts = gain) and phase in degrees per node. No file-format change: the source is chosen per sweep. Dense complex Gaussian elimination, so capped at 300 unknowns (shortcut in `ac.rs`); 20,000-point cap. Tauri command `run_ac`; UI `panels/AcPanel.tsx` (Engineer mode only: source, from, to, points per decade, node picker) and `panels/Bode.tsx` (gain in dB and phase, log frequency axis). Tests: `crates/nodal-core/tests/ac.rs` (RC corner -3 dB and -45 degrees, RL, inverting op-amp, common-emitter against the hybrid-pi formula, common-source gain gm*RD, diode small-signal resistance, bad input), `ui/src/panels/Bode.test.tsx`, `AcPanel.test.tsx`. Real window: RC low-pass sweep draws 0 dB to -56 dB and 0 to -90 degrees as expected. Not done: no AC amplitude per source (always 1 V), no input/output impedance, no sparse complex solve, no Kids-mode AC.
 - SPICE import/export done (2026-11-03): see Next steps item 4 for format, losses and tests. Not checked in the real window; PNP, P-MOSFET and Open/Save of new parts are only unit-tested.
-- Not done for BJT, MOSFET, op-amp: Kids tiles (fall back to the generic tile).
+- Kids tiles for BJT/MOSFET (Transistor) and op-amp (Amplifier) added for `tileFor`; they are not in the Kids palette, only shown when an engineer-placed part is viewed in Kids mode.
 
 ## Deferred minors (not fixed)
 
 - Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API;  the oversized-result test only asserts `is_err()`.
-- App: commands accept any path (CSP now set, dialog supplies paths); no `saveCircuit` TS test.
+- App: commands accept any path (CSP now set, dialog supplies paths); `saveCircuit` TS test added.
 - UI: the Kids bulb glows after a run (final-sample power over its watt rating, `panels/glow.ts`); error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
 - Release (fixed, not yet run): macOS builds arm64 and x86_64 targets; `licenseFile` is `src-tauri/LICENSE.txt` (both licenses); actions pinned by SHA in `ci.yml` and `release.yml`. Category "Education" still unchecked against Tauri's list (a `tauri build` would reject a bad value).
 - Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.

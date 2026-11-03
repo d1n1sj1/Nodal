@@ -2,7 +2,7 @@ import { useRef, useState, type MouseEvent } from 'react'
 import type { Mode } from '../modes/mode'
 import type { PartDef } from '../parts/registry'
 import { tileFor, tiles } from '../parts/tiles'
-import { routeWire } from './route'
+import { routeAll } from './route'
 import { addPart, addWire, movePart, pinCount, pinPos, removePart, removeWire, PART_HALF_WIDTH, PART_HALF_HEIGHT, type Pin, type Pos, type Schematic } from './schematic'
 
 const GRID = 20
@@ -99,15 +99,15 @@ export default function Canvas({ schematic, onChange, mode, placing, onPlaced, d
       </defs>
       <rect width="100%" height="100%" fill="url(#grid)" />
 
-      {schematic.wires.map((w, i) => {
-        const points = routeWire(schematic.parts, w.from, w.to).map((p) => `${p.x},${p.y}`).join(' ')
+      {(() => { const routes = routeAll(schematic.parts, schematic.wires); return schematic.wires.map((w, i) => {
+        const points = routes[i].map((p) => `${p.x},${p.y}`).join(' ')
         return (
           <polyline key={i} role="button" tabIndex={0} aria-label={`Wire ${w.from.part} pin ${w.from.pin + 1} to ${w.to.part} pin ${w.to.pin + 1}`}
             className={`wire ${selected === `wire:${i}` ? 'selected' : ''}`} points={points}
             onClick={(e) => { e.stopPropagation(); setSelected(`wire:${i}`) }}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setSelected(`wire:${i}`) } }} />
         )
-      })}
+      }) })()}
 
       {schematic.parts.map((p) => {
         const tile = kids ? tileFor(p.def) : null

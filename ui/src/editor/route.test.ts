@@ -29,3 +29,12 @@ test('wire_never_crosses_its_own_part', () => {
   const pts = routeWire(s.parts, { part: 'p1', pin: 0 }, { part: 'p2', pin: 1 }) // left pin to right pin
   for (const p of s.parts) expect(crosses(pts, p)).toBe(false)
 })
+
+test('wire_avoids_running_along_another_nets_wire', () => {
+  const s = place({ x: 100, y: 100 }, { x: 300, y: 200 }, { x: 100, y: 160 }, { x: 300, y: 260 })
+  const a = routeWire(s.parts, { part: 'p1', pin: 1 }, { part: 'p2', pin: 0 })
+  const b = { part: 'p3', pin: 1 }, d = { part: 'p4', pin: 0 }
+  const vx = (pts: Pos[]) => pts.find((p, i) => i && p.x === pts[i - 1].x && p.y !== pts[i - 1].y)!.x
+  expect(vx(routeWire(s.parts, b, d))).toBe(vx(a)) // alone, both take the same channel
+  expect(vx(routeWire(s.parts, b, d, [a]))).not.toBe(vx(a))
+})

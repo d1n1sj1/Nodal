@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 const invoke = vi.hoisted(() => vi.fn())
 vi.mock('@tauri-apps/api/core', () => ({ invoke }))
 
-import { loadCircuit, runSimulation, type CircuitJson } from './api'
+import { loadCircuit, runSimulation, saveCircuit, type CircuitJson } from './api'
 
 const c: CircuitJson = { version: 1, parts: [{ id: 'V1', kind: 'VSource', pos: 1, neg: 0, volts: 5 }] }
 
@@ -13,6 +13,12 @@ describe('api', () => {
     invoke.mockResolvedValue(out)
     expect(await runSimulation(c, 1, 0.1)).toBe(out)
     expect(invoke).toHaveBeenCalledWith('run_simulation', { circuitJson: JSON.stringify(c), stop: 1, step: 0.1 })
+  })
+
+  it('saveCircuit passes path and serialised circuit', async () => {
+    invoke.mockResolvedValue(undefined)
+    await saveCircuit('/x.json', c)
+    expect(invoke).toHaveBeenLastCalledWith('save_circuit', { path: '/x.json', circuitJson: JSON.stringify(c) })
   })
 
   it('loadCircuit parses returned json', async () => {

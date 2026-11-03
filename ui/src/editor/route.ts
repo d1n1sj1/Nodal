@@ -1,3 +1,4 @@
+import type { Wire } from './schematic'
 import { PART_HALF_HEIGHT, PART_HALF_WIDTH, pinDir, pinPos, type PlacedPart, type Pos } from './schematic'
 
 const GRID = 20
@@ -19,12 +20,31 @@ const length = (pts: Pos[]) => pts.reduce((n, p, i) => (i ? n + Math.abs(p.x - p
 /** Offsets 0, +1, -1, +2, -2, ... in grid steps. */
 const spread = (centre: number) => Array.from({ length: 2 * MAX_STEPS + 1 }, (_, k) => centre + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * GRID * (k ? 1 : 0))
 
+/** Length two collinear axis-aligned segments share. */
+const overlap = (a0: Pos, a1: Pos, b0: Pos, b1: Pos) => {
+  if (a0.x === a1.x && b0.x === b1.x && a0.x === b0.x) return Math.max(0, Math.min(Math.max(a0.y, a1.y), Math.max(b0.y, b1.y)) - Math.max(Math.min(a0.y, a1.y), Math.min(b0.y, b1.y)))
+  if (a0.y === a1.y && b0.y === b1.y && a0.y === b0.y) return Math.max(0, Math.min(Math.max(a0.x, a1.x), Math.max(b0.x, b1.x)) - Math.max(Math.min(a0.x, a1.x), Math.min(b0.x, b1.x)))
+  return 0
+}
+const shared = (pts: Pos[], others: Pos[][]) =>
+  pts.reduce((n, p, i) => (i ? n + others.reduce((m, o) => m + o.reduce((k, q, j) => (j ? k + overlap(pts[i - 1], p, o[j - 1], q) : 0), 0), 0) : 0), 0)
+
+/** Routes every wire in order; each avoids running along earlier wires of other nets (wires sharing a pin are skipped). */
+export function routeAll(parts: PlacedPart[], wires: Wire[]): Pos[][] {
+  const out: Pos[][] = []
+  wires.forEach((w, i) => {
+    const touches = (v: Wire) => [v.from, v.to].some((p) => [w.from, w.to].some((q) => p.part === q.part && p.pin === q.pin))
+    out.push(routeWire(parts, w.from, w.to, out.filter((_, j) => !touches(wires[j]))))
+  })
+  return out
+}
+
 /**
  * Right-angle wire from one pin to another. Leaves each pin outward (Ground: straight up) so it never doubles back
  * across its own part, then takes the shortest of a vertical-channel or horizontal-channel route that clears every
- * part. Falls back to the plain vertical-channel route when none clears. Does not avoid other wires.
+ * part. Falls back to the plain vertical-channel route when none clears. Prefers routes that do not run along `others` (wires of other nets).
  */
-export function routeWire(parts: PlacedPart[], from: { part: string; pin: number }, to: { part: string; pin: number }): Pos[] {
+export function routeWire(parts: PlacedPart[], from: { part: string; pin: number }, to: { part: string; pin: number }, others: Pos[][] = []): Pos[] {
   const a = parts.find((p) => p.id === from.part)!
   const b = parts.find((p) => p.id === to.part)!
   const pa = pinPos(a, from.pin)
@@ -47,5 +67,5 @@ export function routeWire(parts: PlacedPart[], from: { part: string; pin: number
 
   const channels = spread(mid).filter((x) => (!da || (da > 0 ? x >= ea : x <= ea)) && (!db || (db > 0 ? x >= eb : x <= eb)))
   const candidates = [...channels.map(vertical), ...spread(snap((pa.y + pb.y) / 2)).map(horizontal)].filter(clear)
-  return candidates.reduce((best, c) => (length(c) < length(best) ? c : best), candidates[0] ?? fallback)
+  return candidates.reduce((best, c) => (length(c) + 1000 * shared(c, others) < length(best) + 1000 * shared(best, others) ? c : best), candidates[0] ?? fallback)
 }

@@ -28,3 +28,9 @@ test('part_without_tile_gets_generic_tile', () => {
   expect(t.name).toBe(def.name)
   expect(typeof t.picture).toBe('function')
 })
+
+test('active_parts_get_own_kids_tile', () => {
+  for (const id of ['npn', 'pnp', 'nmos', 'pmos', 'opamp']) {
+    expect(tileFor(partDefs.find((p) => p.id === id)!).color).not.toBe('#e2e8f0')
+  }
+})

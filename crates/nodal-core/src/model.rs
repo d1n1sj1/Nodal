@@ -15,13 +15,13 @@ pub enum PartKind {
     Diode { anode: NodeId, cathode: NodeId },
     Led { anode: NodeId, cathode: NodeId, max_amps: f64 },
     Switch { a: NodeId, b: NodeId, closed: bool },
-    /// Ebers-Moll transistor (Is = 1e-14 A, reverse beta 1). `beta` = forward current gain; `max_amps` = collector current limit.
     /// Level-1 (square-law) MOSFET, bulk tied to source, no channel-length modulation. `vth` and `kp` (A/V^2) are
     /// magnitudes for both polarities; `max_amps` = drain current limit.
     Mosfet { d: NodeId, g: NodeId, s: NodeId, pmos: bool, vth: f64, kp: f64, max_amps: f64 },
     /// Behavioural op-amp, ground referenced: out = vsat * tanh(gain * (plus - minus) / vsat), so the limit is soft: about 1.6 mV low at 10 V of a 12 V limit. Inputs draw no current.
     /// `max_amps` = output current limit (a warning, not a clamp).
     Opamp { out: NodeId, plus: NodeId, minus: NodeId, gain: f64, vsat: f64, max_amps: f64 },
+    /// Ebers-Moll transistor (Is = 1e-14 A, reverse beta 1). `beta` = forward current gain; `max_amps` = collector current limit.
     Bjt { c: NodeId, b: NodeId, e: NodeId, pnp: bool, beta: f64, max_amps: f64 },
 }
 
