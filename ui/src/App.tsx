@@ -121,7 +121,7 @@ function App() {
           {part && <Properties key={part.id} part={part} mode={mode} onChange={(v) => setSchematic((s) => updateValues(s, part.id, v))} />}
           <WarningBanner warnings={result?.warnings} mode={mode} schematic={schematic} />
           <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
-          {mode === 'engineer' && <AcPanel schematic={schematic} />}
+          <AcPanel schematic={schematic} mode={mode} />
           {result && (
             <section className="results">
               <label>Node{' '}

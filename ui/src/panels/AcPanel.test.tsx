@@ -6,6 +6,7 @@ const invoke = vi.hoisted(() => vi.fn())
 vi.mock('@tauri-apps/api/core', () => ({ invoke }))
 
 import { addPart, addWire, emptySchematic, type Schematic } from '../editor/schematic'
+import { kidsPalette } from '../parts/registry'
 import AcPanel from './AcPanel'
 
 const at = { x: 0, y: 0 }
@@ -49,4 +50,18 @@ test('a core error is shown and clears the old plot', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Sweep' }))
   await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('nope'))
   expect(invoke).toHaveBeenCalledTimes(1)
+})
+
+test('kids sweep hides the numbers, picks the Wave tile and draws loudness', async () => {
+  invoke.mockResolvedValue({ freqs: [10, 100], magnitude: [[0, 1, 1], [0, 1, 0.5]], phase_deg: [[0, 0, -5], [0, 0, -45]] })
+  const kid = (id: string) => kidsPalette().find((d) => d.id === `kids-${id}`)!
+  let s = addPart(addPart(addPart(emptySchematic(), kid('battery'), at), kid('wave'), at), kid('resistor'), at) // p1 battery, p2 wave, p3 resistor
+  s = addWire(s, { part: 'p2', pin: 0 }, { part: 'p3', pin: 0 })
+  s = addWire(s, { part: 'p3', pin: 1 }, { part: 'p2', pin: 1 })
+  render(<AcPanel schematic={s} mode="kids" />)
+  expect(screen.queryByLabelText('Start frequency')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Sweep pitches' }))
+  await waitFor(() => expect(screen.getByRole('img', { name: 'Loudness' })).toBeTruthy())
+  expect(invoke.mock.calls[0][1]).toMatchObject({ source: 'p2', fStart: 10, fStop: 100000, pointsPerDecade: 20 })
+  expect(screen.queryByRole('img', { name: 'Phase' })).toBeNull()
 })

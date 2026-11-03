@@ -37,8 +37,9 @@ function Plot({ freqs, ys, unit, label }: { freqs: number[]; ys: number[]; unit:
 }
 
 /** Gain (dB) and phase (degrees) of one node against frequency, log frequency axis. */
-export default function Bode({ output, node }: { output: AcOutput; node: number }) {
+export default function Bode({ output, node, kids = false }: { output: AcOutput; node: number; kids?: boolean }) {
   if (output.freqs.length < 2) return null
+  if (kids) return <Plot freqs={output.freqs} ys={output.magnitude.map((m) => (m[node] ?? 0) * 100)} unit="%" label="Loudness" /> // 100% = as loud as the wave going in
   const mag = output.magnitude.map((m) => toDb(m[node] ?? 0))
   const phase = output.phase_deg.map((p) => p[node] ?? 0)
   return (

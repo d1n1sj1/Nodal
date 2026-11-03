@@ -23,7 +23,9 @@ test('kids_palette_maps_to_core_kinds', () => {
   expect(k.Transistor.kind).toBe('Bjt')
   expect(k.Transistor.defaults.pnp).toBe(0)
   expect(k.Amplifier.kind).toBe('Opamp')
-  expect(new Set(kidsPalette().map((d) => d.id)).size).toBe(9)
+  expect(k.Wave.kind).toBe('VSource')
+  expect(k.Wave.defaults).toMatchObject({ amp: 1, freq: 1000, square: 0 })
+  expect(new Set(kidsPalette().map((d) => d.id)).size).toBe(10)
 })
 
 test('part_without_tile_gets_generic_tile', () => {
