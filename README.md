@@ -25,9 +25,9 @@ Installers are not code-signed in v1, so Windows SmartScreen and macOS Gatekeepe
 
 Nodal has Kids mode and Engineer mode over the same circuit file.
 
-- v1 parts: resistor, capacitor, inductor, voltage source, current source, ground, diode, LED, switch.
-- v1 analyses: DC operating point and transient.
-- Later: transistors, op-amps, AC analysis, SPICE import/export.
+- Parts: resistor, capacitor, inductor, voltage source, current source, ground, diode, LED, switch, NPN/PNP transistor, N/P-MOSFET, op-amp.
+- Analyses: DC operating point, transient, AC sweep (Engineer mode).
+- Later: SPICE import/export.
 
 ## Licence
 
