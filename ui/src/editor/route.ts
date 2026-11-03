@@ -32,7 +32,7 @@ const shared = (pts: Pos[], others: Pos[][]) =>
 /** Routes every wire in order; each avoids running along earlier wires of other nets (wires sharing a pin are skipped). */
 export function routeAll(parts: PlacedPart[], wires: Wire[]): Pos[][] {
   const out: Pos[][] = []
-  wires.forEach((w, i) => {
+  wires.forEach((w) => {
     const touches = (v: Wire) => [v.from, v.to].some((p) => [w.from, w.to].some((q) => p.part === q.part && p.pin === q.pin))
     out.push(routeWire(parts, w.from, w.to, out.filter((_, j) => !touches(wires[j]))))
   })
