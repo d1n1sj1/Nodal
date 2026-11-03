@@ -10,6 +10,7 @@ import { emptySchematic, updateValues, type Schematic } from './editor/schematic
 import { useMode, type Mode } from './modes/mode'
 import type { PartDef } from './parts/registry'
 import Properties from './panels/Properties'
+import AcPanel from './panels/AcPanel'
 import RunBar from './panels/RunBar'
 import Scope from './panels/Scope'
 import Readouts from './panels/Readouts'
@@ -120,6 +121,7 @@ function App() {
           {part && <Properties key={part.id} part={part} mode={mode} onChange={(v) => setSchematic((s) => updateValues(s, part.id, v))} />}
           <WarningBanner warnings={result?.warnings} mode={mode} schematic={schematic} />
           <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
+          {mode === 'engineer' && <AcPanel schematic={schematic} />}
           {result && (
             <section className="results">
               <label>Node{' '}

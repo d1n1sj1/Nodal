@@ -69,3 +69,17 @@ fn run_simulation_duplicate_ids_is_error_not_panic() {
     let e = run_simulation_impl(j, 1e-3, 1e-4).unwrap_err();
     assert!(e.contains("duplicate part id"), "{e}");
 }
+
+#[test]
+fn run_ac_returns_rc_corner_and_rejects_bad_source() {
+    let rc = r#"{"version":1,"parts":[
+     {"id":"V1","kind":"VSource","pos":1,"neg":0,"volts":5.0},
+     {"id":"R1","kind":"Resistor","a":1,"b":2,"ohms":1000.0,"max_watts":1.0},
+     {"id":"C1","kind":"Capacitor","a":2,"b":0,"farads":1e-6}]}"#;
+    let fc = 1.0 / (2.0 * std::f64::consts::PI * 1000.0 * 1e-6);
+    let out = run_ac_impl(rc, "V1", fc, 1e4, 10).unwrap();
+    assert!((out.magnitude[0][2] - 0.5f64.sqrt()).abs() < 1e-6);
+    assert_eq!(out.freqs.len(), out.phase_deg.len());
+    serde_json::to_string(&out).unwrap();
+    assert!(run_ac_impl(rc, "R1", fc, 1e4, 10).is_err());
+}

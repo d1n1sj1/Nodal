@@ -17,6 +17,29 @@ pub fn set_dense_max(n: usize) {
     DENSE_MAX.with(|d| d.set(n));
 }
 
+/// Small-signal model of every nonlinear part at the operating point `v` (node voltages by NodeId), stamped into
+/// `g`: junction and transistor conductances, op-amp gain. The caller stamps the linear parts and each op-amp
+/// output `voltage_source(k, out, 0, 0.0)` as in the DC solve; stamped right-hand sides are unused.
+pub(crate) fn linearize(g: &mut Stamper, c: &Circuit, v: &[f64], branch_of: &std::collections::HashMap<&str, usize>) {
+    for j in junctions(c) {
+        g.conductance(j.a, j.k, shockley(v[j.a as usize] - v[j.k as usize], j.nvt).1 + GMIN);
+    }
+    for q in bjts(c) {
+        let (x, y) = q.xy(v);
+        let ev = q.eval(x, y);
+        q.stamp(g, x, y, &ev);
+    }
+    for m in mosfets(c) {
+        let (x, y) = m.xy(v);
+        let ev = m.eval(x, y);
+        m.stamp(g, x, y, &ev);
+    }
+    for o in opamps(c, branch_of) {
+        let df = o.f(o.vd(v)).1;
+        g.branch_control(o.out_k, o.plus, o.minus, -df, df, 0.0);
+    }
+}
+
 /// A sparse column order (permutation and inverse), kept between Newton iterations and transient steps.
 pub(crate) type ColOrder = Option<(Vec<usize>, Vec<usize>)>;
 
@@ -47,6 +70,11 @@ impl Stamper {
             self.stamps.push((i, j, -g));
             self.stamps.push((j, i, -g));
         }
+    }
+
+    /// Matrix stamps so far as (row, col, value); duplicates add up. For AC analysis, which builds a complex matrix.
+    pub(crate) fn entries(&self) -> &[(usize, usize, f64)] {
+        &self.stamps
     }
 
     /// Adds `g` to the matrix at node row `row`, node column `col` (a dependent-source term). Ground is skipped.

@@ -39,6 +39,17 @@ export interface SimOutput {
 export const runSimulation = (c: CircuitJson, stop: number, step: number): Promise<SimOutput> =>
   invoke<SimOutput>('run_simulation', { circuitJson: JSON.stringify(c), stop, step })
 
+export interface AcOutput {
+  freqs: number[]
+  /** [freq][node], volts for a 1 V stimulus */
+  magnitude: number[][]
+  /** [freq][node], degrees */
+  phase_deg: number[][]
+}
+
+export const runAc = (c: CircuitJson, source: string, fStart: number, fStop: number, pointsPerDecade: number): Promise<AcOutput> =>
+  invoke<AcOutput>('run_ac', { circuitJson: JSON.stringify(c), source, fStart, fStop, pointsPerDecade })
+
 export const saveCircuit = (path: string, c: CircuitJson): Promise<void> =>
   invoke<void>('save_circuit', { path, circuitJson: JSON.stringify(c) })
 

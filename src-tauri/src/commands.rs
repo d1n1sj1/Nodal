@@ -1,4 +1,5 @@
 //! Thin wrappers over nodal-core; no solver logic here.
+use nodal_core::ac::ac_sweep;
 use nodal_core::transient::transient;
 use nodal_core::{check_damage, Circuit, DamageWarning};
 use serde::Serialize;
@@ -27,6 +28,19 @@ pub fn run_simulation_impl(circuit_json: &str, stop: f64, step: f64) -> Result<S
     Ok(SimOutput { times: r.times, node_voltages: r.node_voltages, part_currents: r.part_currents, warnings })
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct AcOutput {
+    pub freqs: Vec<f64>,
+    pub magnitude: Vec<Vec<f64>>,
+    pub phase_deg: Vec<Vec<f64>>,
+}
+
+pub fn run_ac_impl(circuit_json: &str, source: &str, f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcOutput, String> {
+    let c = Circuit::from_json(circuit_json).map_err(|e| e.to_string())?;
+    let r = ac_sweep(&c, source, f_start, f_stop, points_per_decade).map_err(|e| e.to_string())?;
+    Ok(AcOutput { freqs: r.freqs, magnitude: r.magnitude, phase_deg: r.phase_deg })
+}
+
 pub fn save_circuit_impl(path: &str, circuit_json: &str) -> Result<(), String> {
     Circuit::from_json(circuit_json).map_err(|e| e.to_string())?;
     // Write a sibling temp file then rename, so a failed write cannot truncate an existing save.
@@ -49,6 +63,11 @@ pub fn load_circuit_impl(path: &str) -> Result<String, String> {
 #[tauri::command(async)]
 pub fn run_simulation(circuit_json: String, stop: f64, step: f64) -> Result<SimOutput, String> {
     run_simulation_impl(&circuit_json, stop, step)
+}
+
+#[tauri::command(async)]
+pub fn run_ac(circuit_json: String, source: String, f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcOutput, String> {
+    run_ac_impl(&circuit_json, &source, f_start, f_stop, points_per_decade)
 }
 
 /// `path` always comes from the native dialog plugin (the UI never builds paths itself).

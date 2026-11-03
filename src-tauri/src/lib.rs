@@ -6,6 +6,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::run_simulation,
+            commands::run_ac,
             commands::save_circuit,
             commands::load_circuit
         ])
