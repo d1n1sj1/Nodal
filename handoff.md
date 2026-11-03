@@ -1,6 +1,6 @@
 # Nodal handoff
 
-Date: 2026-11-02. Status: v0.1.0 tagged and released as a draft. All 14 plan tasks built, reviewed and committed on `main`. A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). Remote: `https://github.com/d1n1sj1/Nodal` (public); `main` and tag `v0.1.0` are pushed.
+Date: 2026-11-03. Status: all roadmap items done (BJT, MOSFET, op-amp, AC analysis, SPICE import/export; see Verified and Next steps). v0.1.0 tagged and released as a draft. All 14 plan tasks built, reviewed and committed on `main`. A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). Remote: `https://github.com/d1n1sj1/Nodal` (public); `main` and tag `v0.1.0` are pushed.
 
 ## What Nodal is
 
@@ -78,7 +78,8 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 - Newton and speed follow-up (2026-11-02): op-amp circuits with positive feedback now converge. `newton(.., rails)` first tries every op-amp from deep positive saturation (20 iterations max) on the first solve of a run (DC op, first transient step); a linear start lands on the unstable solution between the rails. Negative feedback does not converge from there and falls back to the normal start. Inside a Schmitt trigger's hysteresis band both rails are stable and the solver picks +. Checked: Schmitt trigger DC states, relaxation oscillator period within 3% of 2RC ln 3 (`tests/opamp.rs`). An op-amp output driving a capacitor node directly is rejected as singular at rest (source across a short), as for any voltage source.
 - Speed with active parts (`cargo test --release -p nodal-core --test speed`, 1,000 nodes, 1,000 steps): NPN 0.91 s, N-MOSFET 0.87 s, op-amp 0.93 s, diode 0.90 s. Fixed the same day: the COLAMD column order is now cached (`ColOrder`, `Stamper::factor_cached`) across Newton iterations and transient steps, giving about 0.2 s for each (NPN 0.21, N-MOSFET 0.20-0.26, op-amp 0.21-0.38, diode 0.21-0.26), linear ladder 0.04 s.
 - AC analysis done: `nodal_core::ac::ac_sweep(circuit, source_id, f_start, f_stop, points_per_decade)` solves the DC operating point, linearises diodes, LEDs, BJTs, MOSFETs and op-amps around it (`mna::linearize`), then solves a complex system per frequency with the chosen voltage source as a 1 V stimulus (other sources zero, current sources open). Returns magnitude (volts = gain) and phase in degrees per node. No file-format change: the source is chosen per sweep. Dense complex Gaussian elimination, so capped at 300 unknowns (shortcut in `ac.rs`); 20,000-point cap. Tauri command `run_ac`; UI `panels/AcPanel.tsx` (Engineer mode only: source, from, to, points per decade, node picker) and `panels/Bode.tsx` (gain in dB and phase, log frequency axis). Tests: `crates/nodal-core/tests/ac.rs` (RC corner -3 dB and -45 degrees, RL, inverting op-amp, common-emitter against the hybrid-pi formula, common-source gain gm*RD, diode small-signal resistance, bad input), `ui/src/panels/Bode.test.tsx`, `AcPanel.test.tsx`. Real window: RC low-pass sweep draws 0 dB to -56 dB and 0 to -90 degrees as expected. Not done: no AC amplitude per source (always 1 V), no input/output impedance, no sparse complex solve, no Kids-mode AC.
-- Not done for BJT: Kids tile (falls back to the generic tile), Next: SPICE import/export.
+- SPICE import/export done (2026-11-03): see Next steps item 4 for format, losses and tests. Not checked in the real window; PNP, P-MOSFET and Open/Save of new parts are only unit-tested.
+- Not done for BJT, MOSFET, op-amp: Kids tiles (fall back to the generic tile).
 
 ## Deferred minors (not fixed)
 
@@ -90,7 +91,7 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 
 ## Next steps
 
-1. Run the remaining owner checks above.
+1. Run the remaining owner checks above, plus a real-window Open/Save of a `.cir` file.
 2. Decide on a git remote and a first `v*` tag to exercise the release workflow.
 3. Triage the deferred minors.
 4. Roadmap done. SPICE import/export: `crates/nodal-core/src/spice.rs` (`to_spice`, `from_spice`), chosen by a `.cir`/`.sp` extension in `save_circuit`/`load_circuit`. Lossy by design: switches export as 1 mOhm / 1 GOhm resistors, op-amps as a VCVS `E` (vsat resets to 12 V on import), power and current ratings reset to defaults, part ids gain a type letter (`p1` -> `Rp1`). Reads suffixes (k, meg, u...), `+` continuation, named nodes, `.model` NPN/PNP/NMOS/PMOS/D. Not read: subcircuits, `.param`, AC/SIN/PULSE sources, switches, `;` inline comments. Tests: `tests/spice.rs`, one in `src-tauri/tests/commands.rs`. Not window-checked.
