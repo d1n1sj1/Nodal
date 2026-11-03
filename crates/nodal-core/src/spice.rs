@@ -27,35 +27,44 @@ pub fn to_spice(c: &Circuit) -> String {
     use PartKind::*;
     let mut out = String::from("* Nodal circuit\n");
     let mut models = String::new();
+    // an id that already starts with its type letter keeps it (V1 stays V1); a clash falls back to prefixing
+    let mut used = std::collections::HashSet::new();
     for p in &c.parts {
         let id = &p.id;
+        let letter = match &p.kind {
+            Resistor { .. } | Switch { .. } => 'R', Capacitor { .. } => 'C', Inductor { .. } => 'L', VSource { .. } => 'V', ISource { .. } => 'I',
+            Diode { .. } | Led { .. } => 'D', Bjt { .. } => 'Q', Mosfet { .. } => 'M', Opamp { .. } => 'E',
+        };
+        let mut nm = if id.chars().next().is_some_and(|c| c.eq_ignore_ascii_case(&letter)) { id.clone() } else { format!("{letter}{id}") };
+        if used.contains(&nm.to_ascii_lowercase()) { nm = format!("{letter}{id}") }
+        used.insert(nm.to_ascii_lowercase());
         match &p.kind {
-            Resistor { a, b, ohms, .. } => out += &format!("R{id} {} {} {ohms:e}\n", a.0, b.0),
-            Capacitor { a, b, farads } => out += &format!("C{id} {} {} {farads:e}\n", a.0, b.0),
-            Inductor { a, b, henries } => out += &format!("L{id} {} {} {henries:e}\n", a.0, b.0),
+            Resistor { a, b, ohms, .. } => out += &format!("{nm} {} {} {ohms:e}\n", a.0, b.0),
+            Capacitor { a, b, farads } => out += &format!("{nm} {} {} {farads:e}\n", a.0, b.0),
+            Inductor { a, b, henries } => out += &format!("{nm} {} {} {henries:e}\n", a.0, b.0),
             VSource { pos, neg, volts, wave } => {
                 let w = match wave {
                     None => format!("DC {volts:e}"),
                     Some(Wave::Sine { amp, freq }) => format!("SIN({volts:e} {amp:e} {freq:e})"),
                     Some(Wave::Square { amp, freq }) => format!("PULSE({:e} {:e} 0 0 0 {:e} {:e})", volts - amp, volts + amp, 0.5 / freq, 1.0 / freq),
                 };
-                out += &format!("V{id} {} {} {w}\n", pos.0, neg.0)
+                out += &format!("{nm} {} {} {w}\n", pos.0, neg.0)
             }
-            ISource { from, to, amps } => out += &format!("I{id} {} {} DC {amps:e}\n", from.0, to.0),
-            Diode { anode, cathode } => out += &format!("D{id} {} {} DIODE\n", anode.0, cathode.0),
-            Led { anode, cathode, .. } => out += &format!("D{id} {} {} LED\n", anode.0, cathode.0),
+            ISource { from, to, amps } => out += &format!("{nm} {} {} DC {amps:e}\n", from.0, to.0),
+            Diode { anode, cathode } => out += &format!("{nm} {} {} DIODE\n", anode.0, cathode.0),
+            Led { anode, cathode, .. } => out += &format!("{nm} {} {} LED\n", anode.0, cathode.0),
             // SPICE switches are voltage controlled, so a fixed switch becomes a resistor
-            Switch { a, b, closed } => out += &format!("R{id} {} {} {}\n", a.0, b.0, if *closed { "1m" } else { "1G" }),
+            Switch { a, b, closed } => out += &format!("{nm} {} {} {}\n", a.0, b.0, if *closed { "1m" } else { "1G" }),
             Bjt { c, b, e, pnp, beta, .. } => {
-                out += &format!("Q{id} {} {} {} M{id}\n", c.0, b.0, e.0);
+                out += &format!("{nm} {} {} {} M{id}\n", c.0, b.0, e.0);
                 models += &format!(".model M{id} {} (BF={beta:e})\n", if *pnp { "PNP" } else { "NPN" });
             }
             Mosfet { d, g, s, pmos, vth, kp, .. } => {
-                out += &format!("M{id} {} {} {} {} M{id}\n", d.0, g.0, s.0, s.0);
+                out += &format!("{nm} {} {} {} {} M{id}\n", d.0, g.0, s.0, s.0);
                 let sign = if *pmos { -1.0 } else { 1.0 };
                 models += &format!(".model M{id} {} (VTO={:e} KP={kp:e})\n", if *pmos { "PMOS" } else { "NMOS" }, sign * vth);
             }
-            Opamp { out: o, plus, minus, gain, .. } => out += &format!("E{id} {} 0 {} {} {gain:e}\n", o.0, plus.0, minus.0),
+            Opamp { out: o, plus, minus, gain, .. } => out += &format!("{nm} {} 0 {} {} {gain:e}\n", o.0, plus.0, minus.0),
         }
     }
     out += ".model DIODE D (IS=1e-14)\n.model LED D (IS=1e-14)\n";

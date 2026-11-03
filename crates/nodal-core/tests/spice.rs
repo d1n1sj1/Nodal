@@ -73,3 +73,14 @@ fn sine_and_pulse_sources_round_trip() {
     assert_eq!(from_spice(&to_spice(&c)).unwrap().parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>(), c.parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>());
     assert!(from_spice("t\nV1 1 0 SIN(1 2)\nR1 1 0 1\n").is_err());
 }
+
+#[test]
+fn ids_with_their_type_letter_are_not_prefixed_again() {
+    let c = Circuit { parts: vec![
+        part("V1", PartKind::VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
+        part("R1", PartKind::Resistor { a: n(1), b: n(2), ohms: 1e3, max_watts: 0.25 }),
+        part("1", PartKind::Resistor { a: n(2), b: n(0), ohms: 1e3, max_watts: 0.25 }), // would also be R1
+    ] };
+    let text = to_spice(&c);
+    assert!(text.contains("\nV1 1 0") && text.contains("\nR1 1 2") && text.contains("\nR1 2 0"), "{text}");
+}
