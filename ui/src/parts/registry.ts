@@ -52,5 +52,8 @@ export function kidsPalette(): PartDef[] {
     kid('buzzer', tiles.buzzer, 'Resistor', { ohms: 200, max_watts: 0.5 }),
     kid('resistor', tiles.resistor, 'Resistor'),
     motor,
+    kid('led', tiles.led, 'Led'),
+    kid('transistor', tiles.transistor, 'Bjt'), // NPN
+    kid('amplifier', tiles.amplifier, 'Opamp'),
   ]
 }

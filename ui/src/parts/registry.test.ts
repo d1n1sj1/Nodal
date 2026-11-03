@@ -19,7 +19,11 @@ test('kids_palette_maps_to_core_kinds', () => {
   expect(k.Buzzer.kind).toBe('Resistor')
   expect(k.Resistor.kind).toBe('Resistor')
   expect(k.Motor.builds?.map((b) => b.kind)).toEqual(['Resistor', 'Inductor'])
-  expect(new Set(kidsPalette().map((d) => d.id)).size).toBe(6)
+  expect(k.LED.kind).toBe('Led')
+  expect(k.Transistor.kind).toBe('Bjt')
+  expect(k.Transistor.defaults.pnp).toBe(0)
+  expect(k.Amplifier.kind).toBe('Opamp')
+  expect(new Set(kidsPalette().map((d) => d.id)).size).toBe(9)
 })
 
 test('part_without_tile_gets_generic_tile', () => {
