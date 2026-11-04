@@ -5,6 +5,7 @@ import { runAc, type AcOutput } from '../sim/api'
 import Bode from './Bode'
 import type { Mode } from '../modes/mode'
 import { parseSI } from './formatSI'
+import { kidsError } from './kidsError'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -37,7 +38,7 @@ export default function AcPanel({ schematic, mode = 'engineer' }: { schematic: S
       setRan({ out: await runAc(buildCircuit(schematic), chosen, f0, f1, n), of: schematic })
     } catch (e) {
       setRan(null)
-      setError(message(e))
+      setError(kids ? kidsError(message(e)) : message(e))
     } finally {
       setRunning(false)
     }

@@ -5,6 +5,7 @@ import type { Mode } from '../modes/mode'
 import { tileFor } from '../parts/tiles'
 import { runSimulation, type SimOutput } from '../sim/api'
 import { parseSI } from './formatSI'
+import { kidsError } from './kidsError'
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
@@ -39,7 +40,7 @@ export default function RunBar({ schematic, onResult, mode = 'engineer' }: Props
       const out = await runSimulation(circuit, stopS, stepS)
       if (id === latest.current) onResult(out)
     } catch (e) {
-      if (id === latest.current) setError(message(e))
+      if (id === latest.current) setError(mode === 'kids' ? kidsError(message(e)) : message(e))
     } finally {
       if (id === latest.current) setRunning(false)
     }
