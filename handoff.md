@@ -1,6 +1,6 @@
 # Nodal handoff
 
-Date: 2026-11-03. Status: all roadmap items done (BJT, MOSFET, op-amp, AC analysis, SPICE import/export; see Verified and Next steps). v0.1.0 tagged and released as a draft. All 14 plan tasks built, reviewed and committed on `main`. A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). Remote: `https://github.com/d1n1sj1/Nodal` (public); `main` and tag `v0.1.0` are pushed.
+Date: 2026-11-04. Status: all roadmap items done (BJT, MOSFET, op-amp, AC analysis, SPICE import/export; see Verified and Next steps). v0.1.0 and v0.2.0 tagged and published by the owner. All 14 plan tasks built, reviewed and committed on `main`. A final whole-branch review found one Critical and four Important issues; they were fixed in `10d8f95` and `e7f75ed`, and a scoped re-review passed. The app was then launched in a real window, checked, and further UI bugs were fixed (`6cddc1d`, `1fd52fd`, `4eff4fe`, `41751a3`). Remote: `https://github.com/d1n1sj1/Nodal` (public); `main` and tag `v0.1.0` are pushed.
 
 ## What Nodal is
 
@@ -38,7 +38,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 ## Still for the owner
 
 - Owner checks done 2026-11-01 ("everything is fine"): kids tile artwork, wording, contrast colours, close prompt, RC curve on the scope.
-- `v0.1.0` published by the owner.
+- `v0.1.0` and `v0.2.0` published by the owner.
 - Wire routing (`ui/src/editor/route.ts`) avoids parts, and `routeAll` makes later wires avoid running along earlier wires of other nets (2026-11-03). Not checked in the Tauri window.
 - Installers are unsigned, so macOS and Windows will warn (SmartScreen: More info, Run anyway).
 
@@ -46,8 +46,9 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 
 - `v0.1.0` tag at `2d62a86`. `release.yml` ran green on all four jobs (Windows, Linux, macOS arm64, macOS x86_64) and made a draft release; CI is green on `main` and the tag. Asset names were not listed (the API hides drafts); check them in the Releases tab.
 - Release fixes made before tagging: Intel macOS build, `src-tauri/LICENSE.txt` (MIT + Apache) as `licenseFile`, actions pinned by SHA. The "Education" category passed the build.
-- `v0.2.0` tag at `3191a83` (version bumped to 0.2.0 in `tauri.conf.json` and both `Cargo.toml`). The first push at `2db3d4b` failed CI and Release: `tsc -b` (part of `npm run build --prefix ui`) rejects unused variables (TS6133) that `tsc --noEmit` does not flag. Fixed in `route.ts`, tag moved, Release and CI both green. The release is a draft; asset list unchecked (API hides drafts). Always run `npm run build --prefix ui` before pushing.
+- `v0.2.0` tag at `3191a83` (version bumped to 0.2.0 in `tauri.conf.json` and both `Cargo.toml`). The first push at `2db3d4b` failed CI and Release: `tsc -b` (part of `npm run build --prefix ui`) rejects unused variables (TS6133) that `tsc --noEmit` does not flag. Fixed in `route.ts`, tag moved, Release and CI both green. Published by the owner; asset list unchecked (API hides drafts). Always run `npm run build --prefix ui` before pushing.
 - 2026-11-03 after v0.2.0: Kids palette now has LED, Transistor (NPN), Amplifier (op-amp) and Wave (signal source, same defaults as the engineer one). Real window (CDP, as above): Kids battery+LED+resistor loop and battery+bulb+NPN+base resistor circuit both simulate over IPC with no errors; the bulb glows. Kids-mode AC: the AC panel now shows in Kids mode as "Pitch sweep" (fixed 10 Hz to 100 kHz, 20 points per decade, source = the Wave tile, else the first voltage source, one "Loudness" % plot, starts on the last node); window-checked on Wave + Motor + Resistor (flat to 1 kHz, 16% at 100 kHz). Kids has no capacitor tile, so only the motor coil gives a pitch-dependent circuit. Not window-checked: Amplifier tile, Open/Save of the new tiles, close-prompt Yes/No. `cargo test --workspace`, release speed tests and 115 UI tests pass.
+- 2026-11-04: AC sweep no longer capped at 300 unknowns (`068c2e9`): block-real solve through the shared sparse LU (see AC entry above). New tests in `tests/ac.rs`: sparse vs dense agree, 1,000-node ladder runs. CI green on `068c2e9`. Not timed in the real window on a large circuit.
 
 ## Decisions
 
@@ -96,6 +97,6 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 ## Next steps
 
 1. Run the remaining owner checks above, plus a real-window Open/Save of a `.cir` file.
-2. Publish the `v0.2.0` draft release (owner). Remote and release workflow are done.
+2. Done: `v0.2.0` published. Remote and release workflow are done.
 3. Triage the deferred minors.
 4. Roadmap done. SPICE import/export: `crates/nodal-core/src/spice.rs` (`to_spice`, `from_spice`), chosen by a `.cir`/`.sp` extension in `save_circuit`/`load_circuit`. Lossy by design: switches export as 1 mOhm / 1 GOhm resistors, op-amps as a VCVS `E` (vsat resets to 12 V on import), power and current ratings reset to defaults, part ids gain a type letter unless they already start with it (`p1` -> `Rp1`, `V1` stays `V1`; a name clash falls back to prefixing). Reads suffixes (k, meg, u...), `+` continuation, named nodes, `.model` NPN/PNP/NMOS/PMOS/D. Not read: subcircuits, `.param`, AC/SIN/PULSE sources, switches, `;` inline comments. Tests: `tests/spice.rs`, one in `src-tauri/tests/commands.rs`. Not window-checked.
