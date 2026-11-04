@@ -88,10 +88,10 @@ Done: wire routing around parts; `SimError::InvalidInput` for bad values/run set
 
 ## Deferred minors (not fixed)
 
-- Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API;  the oversized-result test only asserts `is_err()`.
+- Core: `KINDS` list in `model.rs` is hand-duplicated from `PartKind` (the round-trip test in `tests/model.rs` fails if one is missing); Rust rejects file versions above 1, a missing version is accepted; `pub` test hooks `set_dense_max` and `dc_op_with_limit` leak into the public API;  the oversized-result test now asserts the "too large" InvalidInput error (2026-11-04).
 - App: commands accept any path (CSP now set, dialog supplies paths); `saveCircuit` TS test added.
 - UI: the Kids bulb glows after a run (final-sample power over its watt rating, `panels/glow.ts`); error text is the same in both modes. Undo/redo (Ctrl+Z, Ctrl+Y, header buttons; edits within 500 ms merge) and an unsaved-changes prompt on Open and window close exist; the close prompt (`onCloseRequested` + `ask`) is not checked in the real window.
-- Release (fixed, not yet run): macOS builds arm64 and x86_64 targets; `licenseFile` is `src-tauri/LICENSE.txt` (both licenses); actions pinned by SHA in `ci.yml` and `release.yml`. Category "Education" still unchecked against Tauri's list (a `tauri build` would reject a bad value).
+- Release (fixed and run, v0.1.0 and v0.2.0): macOS builds arm64 and x86_64 targets; `licenseFile` is `src-tauri/LICENSE.txt` (both licenses); actions pinned by SHA in `ci.yml` and `release.yml`. Category "Education" passed the build.
 - Risk: the repo lives under OneDrive, which will sync `target/` and `node_modules/`.
 
 ## Next steps
