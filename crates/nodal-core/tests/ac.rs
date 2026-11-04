@@ -98,3 +98,33 @@ fn bad_input_is_invalid_input() {
     assert!(bad(ac_sweep(&c, "V1", 1.0, 1e3, 0).map(|_| ())));
     assert!(bad(ac_sweep(&c, "V1", 1.0, 1e12, 100_000).map(|_| ())));
 }
+
+/// 1 V source on node 1, then R (1 kOhm) from node k to k+1 and C (1 uF) from k+1 to ground.
+fn ladder(nodes: u32) -> Circuit {
+    let mut parts = vec![vs("V1", 1, 5.0)];
+    for k in 1..nodes {
+        parts.push(res(&format!("R{k}"), k, k + 1, 1000.0));
+        parts.push(part(&format!("C{k}"), Capacitor { a: n(k + 1), b: n(0), farads: 1e-6 }));
+    }
+    Circuit { parts }
+}
+
+#[test]
+fn sparse_and_dense_ac_agree() {
+    let c = ladder(40); // 40 unknowns: 80 in the real block form
+    nodal_core::mna::set_dense_max(usize::MAX);
+    let dense = ac_sweep(&c, "V1", 1.0, 1e4, 5).unwrap();
+    nodal_core::mna::set_dense_max(0);
+    let sparse = ac_sweep(&c, "V1", 1.0, 1e4, 5).unwrap();
+    nodal_core::mna::set_dense_max(50);
+    for (d, s) in dense.magnitude.iter().flatten().zip(sparse.magnitude.iter().flatten()) { assert!((d - s).abs() < 1e-9, "{d} vs {s}"); }
+    for (d, s) in dense.phase_deg.iter().flatten().zip(sparse.phase_deg.iter().flatten()) { assert!((d - s).abs() < 1e-3, "{d} vs {s}"); }
+}
+
+#[test]
+fn thousand_node_ladder_ac_runs_past_the_old_300_unknown_cap() {
+    let r = ac_sweep(&ladder(1000), "V1", 0.1, 1e3, 2).unwrap();
+    let last = r.magnitude[0].len() - 1;
+    assert!(r.magnitude[0][2] > 0.9, "first node at low frequency {}", r.magnitude[0][2]);
+    assert!(r.magnitude.last().unwrap()[last] < 1e-6, "high frequencies must die out along the ladder");
+}

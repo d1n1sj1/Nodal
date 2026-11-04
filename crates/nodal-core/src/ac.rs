@@ -13,50 +13,8 @@ pub struct AcResult {
     pub phase_deg: Vec<Vec<f64>>,
 }
 
-const MAX_UNKNOWNS: usize = 300;
 const MAX_POINTS: f64 = 20_000.0;
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
-
-#[derive(Clone, Copy, Default)]
-struct Cx { re: f64, im: f64 }
-
-impl Cx {
-    fn mul(self, o: Cx) -> Cx { Cx { re: self.re * o.re - self.im * o.im, im: self.re * o.im + self.im * o.re } }
-    fn sub(self, o: Cx) -> Cx { Cx { re: self.re - o.re, im: self.im - o.im } }
-    fn abs2(self) -> f64 { self.re * self.re + self.im * self.im }
-    fn div(self, o: Cx) -> Cx {
-        let d = o.abs2();
-        Cx { re: (self.re * o.re + self.im * o.im) / d, im: (self.im * o.re - self.re * o.im) / d }
-    }
-}
-
-/// Dense complex Gaussian elimination with partial pivoting.
-/// shortcut: dense, so capped at 300 unknowns; use a sparse complex LU to go larger.
-fn solve(mut a: Vec<Vec<Cx>>, mut b: Vec<Cx>) -> Result<Vec<Cx>, SimError> {
-    let n = b.len();
-    let scale: Vec<f64> = (0..n).map(|c| a.iter().map(|r| r[c].abs2().sqrt()).fold(0.0, f64::max)).collect();
-    for c in 0..n {
-        let p = (c..n).max_by(|&x, &y| a[x][c].abs2().total_cmp(&a[y][c].abs2())).unwrap();
-        if !(a[p][c].abs2().sqrt() > 1e-12 * scale[c]) {
-            return Err(SimError::Singular("AC matrix is singular: voltage sources in a loop or a source across a zero-ohm path".into()));
-        }
-        a.swap(c, p);
-        b.swap(c, p);
-        for r in c + 1..n {
-            let f = a[r][c].div(a[c][c]);
-            if f.abs2() == 0.0 { continue; }
-            for k in c..n { let t = f.mul(a[c][k]); a[r][k] = a[r][k].sub(t); }
-            let t = f.mul(b[c]);
-            b[r] = b[r].sub(t);
-        }
-    }
-    for c in (0..n).rev() {
-        let mut s = b[c];
-        for k in c + 1..n { s = s.sub(a[c][k].mul(b[k])); }
-        b[c] = s.div(a[c][c]);
-    }
-    Ok(b)
-}
 
 /// Small-signal frequency sweep. Solves the DC operating point, linearises every part around it, then for each
 /// frequency solves the complex system with voltage source `source` as a 1 V AC stimulus (all other sources
@@ -86,9 +44,6 @@ pub fn ac_sweep(c: &Circuit, source: &str, f_start: f64, f_stop: f64, points_per
         }
     }
     let size = n - 1 + branch_of.len();
-    if size > MAX_UNKNOWNS {
-        return Err(SimError::InvalidInput(format!("AC analysis supports up to {MAX_UNKNOWNS} unknowns (this circuit has {size})")));
-    }
 
     // Frequency-independent part (real), plus the reactive parts to add per frequency.
     let mut g = Stamper::new(n, branch_of.len());
@@ -111,10 +66,13 @@ pub fn ac_sweep(c: &Circuit, source: &str, f_start: f64, f_stop: f64, points_per
         }
     }
     linearize(&mut g, c, &op, &branch_of);
-    let mut base = vec![vec![Cx::default(); size]; size];
-    for &(r, col, v) in g.entries() { base[r][col].re += v; }
-    let mut rhs = vec![Cx::default(); size];
-    rhs[n - 1 + branch_of[source]].re = 1.0;
+    // Complex system (Gr + jGi)(xr + jxi) = br as one real system [Gr -Gi; Gi Gr][xr; xi] = [br; 0], so the
+    // sparse real LU (and its cached column order) does the work.
+    let mut base: Vec<(usize, usize, f64)> = Vec::with_capacity(2 * g.entries().len());
+    for &(r, col, v) in g.entries() { base.extend([(r, col, v), (r + size, col + size, v)]); }
+    let mut rhs = vec![0.0; 2 * size];
+    rhs[n - 1 + branch_of[source]] = 1.0;
+    let mut order = None;
 
     let points = (decades * points_per_decade as f64).ceil() as usize + 1;
     let ratio = f_stop / f_start;
@@ -123,20 +81,23 @@ pub fn ac_sweep(c: &Circuit, source: &str, f_start: f64, f_stop: f64, points_per
         let f = if i + 1 == points { f_stop } else { f_start * ratio.powf(i as f64 / (points - 1) as f64) };
         let w = 2.0 * std::f64::consts::PI * f;
         let mut a = base.clone();
+        let mut imag = |r: usize, col: usize, y: f64| a.extend([(r, col + size, -y), (r + size, col, y)]);
         for &(na, nb, farads) in &caps {
             let y = w * farads;
             let (ia, ib) = ((na != 0).then(|| na as usize - 1), (nb != 0).then(|| nb as usize - 1));
-            if let Some(i) = ia { a[i][i].im += y; }
-            if let Some(j) = ib { a[j][j].im += y; }
-            if let (Some(i), Some(j)) = (ia, ib) { a[i][j].im -= y; a[j][i].im -= y; }
+            if let Some(i) = ia { imag(i, i, y); }
+            if let Some(j) = ib { imag(j, j, y); }
+            if let (Some(i), Some(j)) = (ia, ib) { imag(i, j, -y); imag(j, i, -y); }
         }
-        for &(row, henries) in &inds { a[row][row].im -= w * henries; }
-        let x = solve(a, rhs.clone())?;
+        for &(row, henries) in &inds { imag(row, row, -w * henries); }
+        let cause = "AC matrix is singular: voltage sources in a loop or a source across a zero-ohm path";
+        let x = Stamper::from_entries(a, rhs.clone()).solve_cached(cause, &mut order)?;
         let mut mag = vec![0.0; n];
         let mut ph = vec![0.0; n];
-        for (k, v) in x[..n - 1].iter().enumerate() {
-            mag[k + 1] = v.abs2().sqrt();
-            ph[k + 1] = v.im.atan2(v.re).to_degrees();
+        for k in 0..n - 1 {
+            let (re, im) = (x[k], x[k + size]);
+            mag[k + 1] = re.hypot(im);
+            ph[k + 1] = im.atan2(re).to_degrees();
         }
         out.freqs.push(f);
         out.magnitude.push(mag);

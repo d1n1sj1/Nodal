@@ -58,6 +58,11 @@ impl Stamper {
         Stamper { nodes, stamps: Vec::new(), rhs: vec![0.0; nodes + branches] }
     }
 
+    /// A system built from raw (row, col, value) entries and a right-hand side, for the AC real-block form.
+    pub(crate) fn from_entries(stamps: Vec<(usize, usize, f64)>, rhs: Vec<f64>) -> Self {
+        Stamper { nodes: 0, stamps, rhs }
+    }
+
     fn idx(node: u32) -> Option<usize> {
         (node != 0).then(|| node as usize - 1)
     }
