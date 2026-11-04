@@ -128,6 +128,13 @@ test('kids_led_transistor_amplifier_build_core_parts', () => {
   expect(new Set([bjt.c, bjt.b, bjt.e]).size).toBe(3) // unwired pins get their own nodes
 })
 
+test('kids_capacitor_builds_a_core_capacitor', () => {
+  const s = addWire(addPart(addPart(emptySchematic(), kid('capacitor'), at), kid('resistor'), at), { part: 'p1', pin: 1 }, { part: 'p2', pin: 0 })
+  const [cap, r] = buildCircuit(s).parts as unknown as { kind: string; farads: number; b: number; a: number }[]
+  expect(cap).toMatchObject({ kind: 'Capacitor', farads: 1e-6 })
+  expect(cap.b).toBe(r.a)
+})
+
 test('kids_motor_keeps_builds_defaults', () => {
   const s = updateValues(addPart(emptySchematic(), kid('motor'), at), 'p1', { ohms: 1 })
   expect(buildCircuit(s).parts[0]).toMatchObject({ ohms: 50 })
