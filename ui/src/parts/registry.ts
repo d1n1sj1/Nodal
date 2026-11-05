@@ -56,6 +56,7 @@ export function kidsPalette(): PartDef[] {
     kid('transistor', tiles.transistor, 'Bjt'), // NPN
     kid('capacitor', tiles.capacitor, 'Capacitor'),
     kid('wave', tiles.wave, 'VSource', { volts: 0, amp: 1, freq: 1000, square: 0, duty: 0.5 }), // same values as the engineer signal source
+    kid('coil', tiles.coil, 'Inductor', { henries: 0.01 }),
     kid('amplifier', tiles.amplifier, 'Opamp'),
   ]
 }

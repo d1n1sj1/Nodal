@@ -24,6 +24,7 @@ export const tiles = {
   transistor: { name: 'Transistor', color: '#fed7aa', picture: pic(<><circle cx="22" cy="22" r="14" fill="#fb923c" /><path d="M16 14v16M6 22h10M16 19l12-8M16 25l12 8" /></>) },
   wave: { name: 'Wave', color: '#d9f99d', picture: pic(<path d="M3 22q6.5-18 13 0t13 0t13 0" stroke="#65a30d" />) },
   capacitor: { name: 'Capacitor', color: '#fef08a', picture: pic(<><path d="M6 22h12M26 22h12" /><path d="M18 10v24M26 10v24" stroke="#a855f7" /></>) },
+  coil: { name: 'Coil', color: '#fecdd3', picture: pic(<path d="M3 26h6a5 5 0 0 1 10 0a5 5 0 0 1 10 0a5 5 0 0 1 10 0h2" stroke="#e11d48" />) },
   amplifier: { name: 'Amplifier', color: '#cffafe', picture: pic(<><path d="M10 8l24 14-24 14z" fill="#22d3ee" /><path d="M14 18h5M16.5 15.5v5M14 27h5" /></>) },
 } satisfies Record<string, KidsTile>
 

@@ -161,3 +161,10 @@ test('node_labels_match_build_numbering_for_kids_parts', () => {
   expect(labels[l.b]).toBe(`${l.b}: Motor p3 right`)
   expect(labels).toHaveLength(l.b + 1)
 })
+
+test('kids_coil_builds_a_core_inductor', () => {
+  const s = addWire(addPart(addPart(emptySchematic(), kid('coil'), at), kid('resistor'), at), { part: 'p1', pin: 1 }, { part: 'p2', pin: 0 })
+  const [coil, r] = buildCircuit(s).parts as unknown as { kind: string; henries: number; b: number; a: number }[]
+  expect(coil).toMatchObject({ kind: 'Inductor', henries: 0.01 })
+  expect(coil.b).toBe(r.a)
+})
