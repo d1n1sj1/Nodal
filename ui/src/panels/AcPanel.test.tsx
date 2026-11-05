@@ -65,3 +65,10 @@ test('kids sweep hides the numbers, picks the Wave tile and draws loudness', asy
   expect(invoke.mock.calls[0][1]).toMatchObject({ source: 'p2', fStart: 10, fStop: 100000, pointsPerDecade: 20 })
   expect(screen.queryByRole('img', { name: 'Phase' })).toBeNull()
 })
+
+test('kids core error is put in plain words', async () => {
+  invoke.mockImplementation(() => Promise.reject(new Error('The solver did not converge after 50 iterations.')))
+  render(<AcPanel schematic={rc()} mode="kids" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Sweep pitches' }))
+  await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/got confused/))
+})

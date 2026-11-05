@@ -88,3 +88,15 @@ test('kids_loose_end_message_names_the_tile', () => {
   expect(screen.getByRole('alert').textContent).toBe('The Bulb has a loose end — connect both sides!')
   expect(runSimulation).not.toHaveBeenCalled()
 })
+
+test('kids_core_error_is_put_in_plain_words_but_engineer_keeps_it', async () => {
+  const raw = 'The circuit cannot be solved: voltage sources in a loop'
+  impl.fn = async () => { throw new Error(raw) }
+  const { unmount } = render(<RunBar schematic={withPart()} onResult={vi.fn()} mode="kids" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Play' }))
+  expect((await screen.findByRole('alert')).textContent).toMatch(/cannot work, like wires joining/)
+  unmount()
+  render(<RunBar schematic={withPart()} onResult={vi.fn()} mode="engineer" />)
+  fireEvent.click(screen.getByRole('button', { name: 'Run' }))
+  expect((await screen.findByRole('alert')).textContent).toBe(raw)
+})
