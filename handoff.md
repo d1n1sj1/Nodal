@@ -38,7 +38,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 ## Still for the owner
 
 - Owner checks done 2026-11-01 ("everything is fine"): kids tile artwork, wording, contrast colours, close prompt, RC curve on the scope.
-- `v0.1.0` and `v0.2.0` published by the owner. `v0.3.0` tagged 2026-11-05 (sparse AC, Kids Capacitor tile, Kids plain-language errors); Release run and asset list unchecked.
+- `v0.1.0`, `v0.2.0` and `v0.3.0` published by the owner. `v0.3.0` (2026-11-05: sparse AC, Kids Capacitor tile, Kids plain-language errors): Release run green, 9 assets (msi, setup.exe, 2 dmg, 2 app.tar.gz, AppImage, deb, rpm). Installers not run on a clean machine.
 - Wire routing (`ui/src/editor/route.ts`) avoids parts, and `routeAll` makes later wires avoid running along earlier wires of other nets (2026-11-03). Not checked in the Tauri window.
 - Installers are unsigned, so macOS and Windows will warn (SmartScreen: More info, Run anyway).
 
