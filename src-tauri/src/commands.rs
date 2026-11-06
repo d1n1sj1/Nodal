@@ -54,7 +54,10 @@ pub fn save_circuit_impl(path: &str, circuit_json: &str) -> Result<(), String> {
     // Write a sibling temp file then rename, so a failed write cannot truncate an existing save.
     let tmp = format!("{path}.tmp");
     let err = |e: std::io::Error| format!("could not write {path}: {e}");
-    std::fs::write(&tmp, data).map_err(err)?;
+    std::fs::write(&tmp, data).map_err(|e| {
+        let _ = std::fs::remove_file(&tmp);
+        err(e)
+    })?;
     std::fs::rename(&tmp, path).map_err(|e| {
         let _ = std::fs::remove_file(&tmp);
         err(e)

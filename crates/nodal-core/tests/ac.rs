@@ -128,3 +128,11 @@ fn thousand_node_ladder_ac_runs_past_the_old_300_unknown_cap() {
     assert!(r.magnitude[0][2] > 0.9, "first node at low frequency {}", r.magnitude[0][2]);
     assert!(r.magnitude.last().unwrap()[last] < 1e-6, "high frequencies must die out along the ladder");
 }
+
+#[test]
+fn zero_or_negative_reactive_values_are_rejected() {
+    for farads in [0.0, -1e-6] {
+        let c = Circuit { parts: vec![vs("V1", 1, 1.0), res("R1", 1, 2, 1000.0), part("C1", Capacitor { a: n(2), b: n(0), farads })] };
+        assert!(matches!(ac_sweep(&c, "V1", 10.0, 1e3, 3), Err(SimError::InvalidInput(_))));
+    }
+}

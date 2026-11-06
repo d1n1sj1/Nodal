@@ -85,3 +85,14 @@ fn ids_with_their_type_letter_are_not_prefixed_again() {
     let text = to_spice(&c);
     assert!(text.contains("\nV1 1 0") && text.contains("\nR1 1 2") && text.contains("\nR1 2 0"), "{text}");
 }
+
+#[test]
+fn v_source_with_no_value_is_an_error_not_a_panic() {
+    assert!(matches!(from_spice("t\nV1 1 0 (\nR1 1 0 1k\n"), Err(SimError::BadFile(_))));
+}
+
+#[test]
+fn mosfet_model_without_vto_imports_and_solves() {
+    let c = from_spice("t\nV1 1 0 5\nV2 2 0 3\nR1 1 3 1k\nM1 3 2 0 0 mn\n.model mn nmos (kp=1e-3)\n").unwrap();
+    assert!(nodal_core::dc::dc_op(&c).is_ok());
+}

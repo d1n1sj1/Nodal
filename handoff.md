@@ -51,6 +51,7 @@ One app, two looks selected by a mode switch: Engineer mode (dark, schematic sym
 - 2026-11-04: AC sweep no longer capped at 300 unknowns (`068c2e9`): block-real solve through the shared sparse LU (see AC entry above). New tests in `tests/ac.rs`: sparse vs dense agree, 1,000-node ladder runs. CI green on `068c2e9`. Not timed in the real window on a large circuit.
 - 2026-11-05 after v0.3.0: Kids Coil tile (core `Inductor`, 10 mH; 12 tiles now). Real window (CDP): Wave + Resistor + Coil, Pitch sweep draws a high-pass, about 0% at 10 Hz up to 99% at 100 kHz, no console errors. Unit tests for the mapping and for `RunBar`/`AcPanel` Kids errors added (`6d8a955`).
 - 2026-11-05 sweep time in the real window (`tauri dev --release`, IPC `run_ac` / `run_simulation` called from the page with a 1,000-node RC ladder): AC 81 points 171 ms, transient 1,000 steps 519 ms. A debug build (plain `tauri dev`) is 2.1 s and 6.1 s, so judge speed on release only. Drawing the result was not timed.
+- 2026-11-06 audit fixes: SPICE `V1 1 0 (` no longer panics (error with line number); a MOSFET model without `VTO` now runs (`vth >= 0`); C and L must be above zero in `validate`, so AC rejects them like transient (the loop in `check_run` is gone, `transient` calls `validate` itself); `save_circuit` removes its `.tmp` when the write fails; Scope memoises and draws at most 2,000 points (min and max kept per bucket). Left alone: `transient_from`/`final_state` have no caller outside tests (owner's call to delete). Not measured: IPC size of a million-step result.
 
 ## Decisions
 

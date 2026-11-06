@@ -41,6 +41,7 @@ const CAUSE: &str = "transient matrix is singular: voltage sources in a loop or 
 /// Linear circuits factor the matrix once; circuits with diodes/LEDs/BJTs/MOSFETs run Newton at every step.
 pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, SimError> {
     check_run(c, stop, step)?;
+    validate(c)?; // before C and L are swapped for sources below, so their values are still checked
     let mut rest = c.clone();
     for p in &mut rest.parts {
         match p.kind {
@@ -77,13 +78,6 @@ fn check_run(c: &Circuit, stop: f64, step: f64) -> Result<(), SimError> {
     // Bounds stored f64s (node voltages + one current per part), ~400 MB at the cap.
     if (stop / step + 1e-9).floor() * (c.node_count() + c.parts.len()) as f64 > MAX_VALUES {
         return Err(SimError::InvalidInput("transient result would be too large; use a larger step or a shorter run".into()));
-    }
-    for p in &c.parts {
-        if let Capacitor { farads: x, .. } | Inductor { henries: x, .. } = p.kind {
-            if !(x.is_finite() && x > 0.0) {
-                return Err(SimError::InvalidInput(format!("part {} has an invalid value (must be finite and above zero)", p.id)));
-            }
-        }
     }
     Ok(())
 }

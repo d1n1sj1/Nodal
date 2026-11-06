@@ -128,7 +128,7 @@ pub fn from_spice(text: &str) -> Result<Circuit, SimError> {
                 need(4)?;
                 let u: Vec<&str> = l.split(['(', ')', ' ', '\t']).filter(|s| !s.is_empty()).collect();
                 let arg = |k: usize| num(u.get(k).ok_or_else(|| bad(*n, format!("{name} has too few waveform values")))?);
-                let (volts, wave) = match u[3].to_ascii_lowercase().as_str() {
+                let (volts, wave) = match u.get(3).ok_or_else(|| bad(*n, format!("{name} has no value")))?.to_ascii_lowercase().as_str() {
                     "sin" => (arg(4)?, Some(Wave::Sine { amp: arg(5)?, freq: arg(6)? })),
                     // shortcut: PULSE becomes an ideal square (duty = width / period); delay and rise/fall times are dropped, upgrade when they are modelled
                     "pulse" => { let (v1, v2, per) = (arg(4)?, arg(5)?, arg(10)?); ((v1 + v2) / 2.0, Some(Wave::Square { amp: (v2 - v1) / 2.0, freq: 1.0 / per, duty: arg(9)? / per })) }
