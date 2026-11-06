@@ -94,3 +94,23 @@ fn run_ac_returns_rc_corner_and_rejects_bad_source() {
     serde_json::to_string(&out).unwrap();
     assert!(run_ac_impl(rc, "R1", fc, 1e4, 10).is_err());
 }
+
+#[test]
+fn load_circuit_malformed_files_error_without_panic() {
+    let cases: &[(&str, &str)] = &[
+        ("empty.cir", ""),
+        ("bin.cir", "\u{0}\u{1}\u{ff}"),
+        ("short.cir", "R1\nC1 1\nV1 1\nM1 1 2 3\nQ1 1\nE1 1 2 3\nD1 1\nL1\nI1 1 0 SIN(\nV2 1 0 PULSE("),
+        ("model.cir", ".model\n.model X\nQ1 1 2 3 X\nM1 1 2 3 3 X W=\nR1 1 0 abc\nR2 1 0 1e999\nR3 1 0 -"),
+        ("utf.cir", "R1 é ü 1k\n+ \nV1 1 0 SIN(1 2"),
+        ("deep.json", "{\"version\":1,\"parts\":[{}]}"),
+        ("nul.json", "null"),
+        ("big.json", "{\"version\":99999999999999999999,\"parts\":[]}"),
+    ];
+    for (name, body) in cases {
+        let p = tmp(name);
+        std::fs::write(&p, body).unwrap();
+        let r = std::panic::catch_unwind(|| load_circuit(p.clone()));
+        assert!(r.is_ok(), "{name} panicked");
+    }
+}
