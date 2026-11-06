@@ -13,24 +13,6 @@ pub struct TransientResult {
     pub part_currents: HashMap<String, Vec<f64>>,
 }
 
-/// Circuit state at one instant, enough to continue a run: node voltages plus every part's current
-/// (capacitor/inductor history comes from these).
-#[derive(Debug, Clone)]
-pub struct TransientState {
-    pub node_voltages: Vec<f64>,
-    pub part_currents: HashMap<String, f64>,
-}
-
-impl TransientResult {
-    /// State at the last time point, for `transient_from`.
-    pub fn final_state(&self) -> TransientState {
-        TransientState {
-            node_voltages: self.node_voltages.last().cloned().unwrap_or_default(),
-            part_currents: self.part_currents.iter().map(|(k, v)| (k.clone(), *v.last().unwrap())).collect(),
-        }
-    }
-}
-
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
 const MAX_STEPS: f64 = 1e7;
 const MAX_VALUES: f64 = 5e7;
@@ -51,21 +33,7 @@ pub fn transient(c: &Circuit, stop: f64, step: f64) -> Result<TransientResult, S
         }
     }
     let dc = dc_op(&rest)?;
-    run(c, TransientState { node_voltages: dc.node_voltages, part_currents: dc.part_currents }, stop, step)
-}
-
-/// Like `transient`, but starts from `initial` (e.g. another run's `final_state()`) instead of rest.
-/// The circuit may differ from the one that produced `initial` in values, not in topology or part ids.
-pub fn transient_from(c: &Circuit, initial: &TransientState, stop: f64, step: f64) -> Result<TransientResult, SimError> {
-    validate(c)?;
-    check_run(c, stop, step)?;
-    if initial.node_voltages.len() != c.node_count() || c.parts.iter().any(|p| !initial.part_currents.contains_key(&p.id)) {
-        return Err(SimError::InvalidInput("initial state does not match the circuit's nodes and parts".into()));
-    }
-    if initial.node_voltages.iter().chain(initial.part_currents.values()).any(|x| !x.is_finite()) {
-        return Err(SimError::InvalidInput("initial state contains a non-finite value".into()));
-    }
-    run(c, initial.clone(), stop, step)
+    run(c, dc.node_voltages, dc.part_currents, stop, step)
 }
 
 fn check_run(c: &Circuit, stop: f64, step: f64) -> Result<(), SimError> {
@@ -82,7 +50,7 @@ fn check_run(c: &Circuit, stop: f64, step: f64) -> Result<(), SimError> {
     Ok(())
 }
 
-fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<TransientResult, SimError> {
+fn run(c: &Circuit, init_v: Vec<f64>, init_i: HashMap<String, f64>, stop: f64, step: f64) -> Result<TransientResult, SimError> {
     let steps = (stop / step + 1e-9).floor() as usize;
     let n = c.node_count();
     let mut branch_of = HashMap::new();
@@ -120,9 +88,9 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
     let fast = if js.is_empty() && qs.is_empty() && ms.is_empty() && os.is_empty() { Some(s.clone().factor(CAUSE)?) } else { None };
 
     // Per-part history: current through and voltage across (a - b) at the previous point.
-    let mut ist: Vec<f64> = c.parts.iter().map(|p| init.part_currents[&p.id]).collect();
+    let mut ist: Vec<f64> = c.parts.iter().map(|p| init_i[&p.id]).collect();
     let mut vst: Vec<f64> = c.parts.iter().map(|p| match p.kind {
-        Capacitor { a, b, .. } | Inductor { a, b, .. } => vd(&init.node_voltages, a, b),
+        Capacitor { a, b, .. } | Inductor { a, b, .. } => vd(&init_v, a, b),
         _ => 0.0,
     }).collect();
 
@@ -130,7 +98,7 @@ fn run(c: &Circuit, init: TransientState, stop: f64, step: f64) -> Result<Transi
     times.push(0.0);
     let mut currents: Vec<Vec<f64>> = ist.iter().map(|&i| { let mut v = Vec::with_capacity(steps + 1); v.push(i); v }).collect();
     let mut node_voltages = Vec::with_capacity(steps + 1);
-    node_voltages.push(init.node_voltages);
+    node_voltages.push(init_v);
 
     let mut order = None; // sparse column order, computed once and reused by every Newton solve
     for k in 1..=steps {

@@ -1,5 +1,5 @@
 use nodal_core::dc::{dc_op, dc_op_with_limit};
-use nodal_core::transient::{transient, transient_from};
+use nodal_core::transient::transient;
 use nodal_core::{Circuit, NodeId, Part, PartKind, PartKind::*, SimError};
 use std::time::Instant;
 
@@ -115,7 +115,7 @@ fn diode_blocks_reverse_step_in_transient() {
     assert!(on > 4.0, "forward load voltage {on}");
     assert!(first.part_currents["D1"].last().unwrap() > &4e-3);
 
-    let second = transient_from(&circuit(-5.0), &first.final_state(), 1e-3, 1e-5).unwrap();
+    let second = transient(&circuit(-5.0), 1e-3, 1e-5).unwrap();
     for v in &second.node_voltages[1..] {
         assert!(v[2] >= -0.01, "load went to {}", v[2]);
     }
@@ -130,22 +130,4 @@ fn diode_reached_only_through_diode_is_not_floating() {
         part("D1", Diode { anode: n(2), cathode: n(0) }),
     ]};
     assert!(dc_op(&c).is_ok());
-}
-
-#[test]
-fn transient_from_rejects_bad_initial_state() {
-    let c = series(5.0, false);
-    let good = transient(&c, 1e-4, 1e-5).unwrap().final_state();
-
-    let mut s = good.clone();
-    s.node_voltages[1] = f64::NAN;
-    assert!(matches!(transient_from(&c, &s, 1e-4, 1e-5), Err(SimError::InvalidInput(m)) if m.contains("non-finite")));
-
-    let mut s = good.clone();
-    s.part_currents.insert("R1".into(), f64::INFINITY);
-    assert!(matches!(transient_from(&c, &s, 1e-4, 1e-5), Err(SimError::InvalidInput(_))));
-
-    let mut s = good;
-    s.part_currents.remove("D1");
-    assert!(matches!(transient_from(&c, &s, 1e-4, 1e-5), Err(SimError::InvalidInput(m)) if m.contains("does not match")));
 }
