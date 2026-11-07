@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { WAVE_SHAPES } from '../editor/buildCircuit'
 import type { PlacedPart } from '../editor/schematic'
 import type { Mode } from '../modes/mode'
 import { tileFor } from '../parts/tiles'
@@ -27,7 +28,7 @@ export default function Properties({ part, mode, onChange }: Props) {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const name = kids ? tileFor(part.def).name : part.def.name
   // multi-part kids items (motor) build from fixed defaults, so there is nothing to edit
-  const keys = part.def.builds && part.def.builds.length > 1 ? [] : Object.keys(part.def.defaults).filter((k) => k !== 'closed' && k !== 'pnp' && k !== 'pmos' && k !== 'square' && (k !== 'duty' || part.values.square === 1))
+  const keys = part.def.builds && part.def.builds.length > 1 ? [] : Object.keys(part.def.defaults).filter((k) => k !== 'closed' && k !== 'pnp' && k !== 'pmos' && k !== 'shape' && (k !== 'duty' || part.values.shape === 1))
   const isSwitch = part.def.kind === 'Switch'
   if (!keys.length && !isSwitch) return null
 
@@ -43,7 +44,6 @@ export default function Properties({ part, mode, onChange }: Props) {
     return SIGNED.includes(k) ? `${LABELS[k] ?? k}: enter a number like 5, -2.5 or 500m.` : `${LABELS[k] ?? k}: enter a number above zero, like 1k or 4.7u.`
   }
   const closed = part.values.closed !== 0
-  const square = part.values.square === 1
 
   return (
     <section className="properties" aria-label={`${name} properties`}>
@@ -68,10 +68,11 @@ export default function Properties({ part, mode, onChange }: Props) {
           <button type="button" aria-pressed={closed} onClick={() => onChange({ closed: 1 })}>Closed</button>
         </div>
       )}
-      {'square' in part.def.defaults && (
+      {'shape' in part.def.defaults && (
         <div className="mode-switch" role="group" aria-label={`${name} shape`}>
-          <button type="button" aria-pressed={!square} onClick={() => onChange({ square: 0 })}>Sine</button>
-          <button type="button" aria-pressed={square} onClick={() => onChange({ square: 1 })}>Square</button>
+          {WAVE_SHAPES.map((s, i) => (
+            <button key={s} type="button" aria-pressed={part.values.shape === i} onClick={() => onChange({ shape: i })}>{s}</button>
+          ))}
         </div>
       )}
     </section>

@@ -1,6 +1,6 @@
 import type { CircuitJson } from '../sim/api'
 import { partDefs } from '../parts/registry'
-import { PIN_FIELDS } from './buildCircuit'
+import { PIN_FIELDS, WAVE_SHAPES } from './buildCircuit'
 import { addWire, type Pin, type PlacedPart, type Schematic } from './schematic'
 
 /** Core files carry no layout: lay parts out on a grid and rebuild wires from shared nodes. Throws on bad input. */
@@ -10,12 +10,12 @@ export function schematicFromCircuit(c: CircuitJson): Schematic {
   const parts: PlacedPart[] = []
   const byNode = new Map<number, Pin[]>()
   c.parts.forEach((jp, i) => {
-    const def = partDefs.find((d) => d.kind === jp.kind && (jp.kind === 'VSource' ? ('square' in d.defaults) === !!jp.wave : jp.kind === 'Bjt' ? d.defaults.pnp === (jp.pnp ? 1 : 0) : jp.kind !== 'Mosfet' || d.defaults.pmos === (jp.pmos ? 1 : 0)))
+    const def = partDefs.find((d) => d.kind === jp.kind && (jp.kind === 'VSource' ? ('shape' in d.defaults) === !!jp.wave : jp.kind === 'Bjt' ? d.defaults.pnp === (jp.pnp ? 1 : 0) : jp.kind !== 'Mosfet' || d.defaults.pmos === (jp.pmos ? 1 : 0)))
     if (!def) throw new Error(`Unknown part kind "${String((jp as { kind: unknown }).kind)}".`)
     const rec = jp as unknown as Record<string, number | boolean>
     const values: Record<string, number> = {}
     for (const k of Object.keys(def.defaults)) values[k] = typeof rec[k] === 'boolean' ? (rec[k] ? 1 : 0) : (rec[k] as number)
-    if (jp.kind === 'VSource' && jp.wave) Object.assign(values, { amp: jp.wave.amp, freq: jp.wave.freq, square: jp.wave.shape === 'Square' ? 1 : 0, duty: jp.wave.duty ?? 0.5 })
+    if (jp.kind === 'VSource' && jp.wave) Object.assign(values, { amp: jp.wave.amp, freq: jp.wave.freq, shape: WAVE_SHAPES.indexOf(jp.wave.shape), duty: jp.wave.duty ?? 0.5 })
     parts.push({ id: jp.id, def, values, pos: { x: 120 + (i % 4) * 180, y: 80 + Math.floor(i / 4) * 120 } })
     PIN_FIELDS[def.kind as keyof typeof PIN_FIELDS].forEach((f, pin) => {
       const n = rec[f] as number

@@ -9,6 +9,9 @@ export const PIN_FIELDS: Record<PartKindName, string[]> = {
   Bjt: ['c', 'b', 'e'], Mosfet: ['d', 'g', 's'], Opamp: ['out', 'plus', 'minus'],
 }
 
+/** Signal source `shape` value -> core wave name (index = the value). */
+export const WAVE_SHAPES = ['Sine', 'Square', 'Triangle', 'Sawtooth'] as const
+
 export const pinKey = (p: Pin) => `${p.part}:${p.pin}`
 
 /** Shared by buildCircuit and nodeLabels so node numbers always agree. `pins` maps every pin/mid key nodeOf saw to its node. */
@@ -50,9 +53,10 @@ function solve(s: Schematic): { parts: PartJson[]; pins: Map<string, number> } {
       const fields = PIN_FIELDS[b.kind]
       const vals: Record<string, number | boolean> = { ...b.defaults }
       if (b.kind === 'Switch') vals.closed = vals.closed !== 0
-      if ('square' in vals) { // signal source: amp/freq/square fold into the core's `wave`
-        vals.wave = { shape: vals.square ? 'Square' : 'Sine', amp: vals.amp, freq: vals.freq, ...(vals.square && { duty: vals.duty }) } as never
-        delete vals.amp; delete vals.freq; delete vals.square; delete vals.duty
+      if ('shape' in vals) { // signal source: amp/freq/shape fold into the core's `wave`
+        const shape = WAVE_SHAPES[vals.shape as number]
+        vals.wave = { shape, amp: vals.amp, freq: vals.freq, ...(shape === 'Square' && { duty: vals.duty }) } as never
+        delete vals.amp; delete vals.freq; delete vals.shape; delete vals.duty
       }
       if (b.kind === 'Bjt') vals.pnp = vals.pnp !== 0
       if (b.kind === 'Mosfet') vals.pmos = vals.pmos !== 0

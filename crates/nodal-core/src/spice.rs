@@ -47,6 +47,8 @@ pub fn to_spice(c: &Circuit) -> String {
                     None => format!("DC {volts:e}"),
                     Some(Wave::Sine { amp, freq }) => format!("SIN({volts:e} {amp:e} {freq:e})"),
                     Some(Wave::Square { amp, freq, duty }) => format!("PULSE({:e} {:e} 0 0 0 {:e} {:e})", volts - amp, volts + amp, duty / freq, 1.0 / freq),
+                    Some(Wave::Triangle { amp, freq }) => format!("PULSE({:e} {:e} 0 {:e} {:e} 0 {:e})", volts - amp, volts + amp, 0.5 / freq, 0.5 / freq, 1.0 / freq),
+                    Some(Wave::Sawtooth { amp, freq }) => format!("PULSE({:e} {:e} 0 {:e} 0 0 {:e})", volts - amp, volts + amp, 1.0 / freq, 1.0 / freq),
                 };
                 out += &format!("{nm} {} {} {w}\n", pos.0, neg.0)
             }
@@ -130,8 +132,15 @@ pub fn from_spice(text: &str) -> Result<Circuit, SimError> {
                 let arg = |k: usize| num(u.get(k).ok_or_else(|| bad(*n, format!("{name} has too few waveform values")))?);
                 let (volts, wave) = match u.get(3).ok_or_else(|| bad(*n, format!("{name} has no value")))?.to_ascii_lowercase().as_str() {
                     "sin" => (arg(4)?, Some(Wave::Sine { amp: arg(5)?, freq: arg(6)? })),
-                    // shortcut: PULSE becomes an ideal square (duty = width / period); delay and rise/fall times are dropped, upgrade when they are modelled
-                    "pulse" => { let (v1, v2, per) = (arg(4)?, arg(5)?, arg(10)?); ((v1 + v2) / 2.0, Some(Wave::Square { amp: (v2 - v1) / 2.0, freq: 1.0 / per, duty: arg(9)? / per })) }
+                    // shortcut: a PULSE with no flat top and a symmetric (triangle) or one-sided (sawtooth) edge pair is read as that wave; any other PULSE becomes an ideal square (duty = width / period) and delay and rise/fall times are dropped, upgrade when they are modelled
+                    "pulse" => {
+                        let (v1, v2, tr, tf, pw, per) = (arg(4)?, arg(5)?, arg(7)?, arg(8)?, arg(9)?, arg(10)?);
+                        let (amp, freq, eq) = ((v2 - v1) / 2.0, 1.0 / per, |a: f64, b: f64| (a - b).abs() < 1e-6 * per);
+                        let wave = if eq(pw, 0.0) && eq(tr, per / 2.0) && eq(tf, per / 2.0) { Wave::Triangle { amp, freq } }
+                            else if eq(pw, 0.0) && eq(tr, per) && eq(tf, 0.0) { Wave::Sawtooth { amp, freq } }
+                            else { Wave::Square { amp, freq, duty: pw / per } };
+                        ((v1 + v2) / 2.0, Some(wave))
+                    }
                     _ => (src()?, None),
                 };
                 PartKind::VSource { pos: node(t[1]), neg: node(t[2]), volts, wave }

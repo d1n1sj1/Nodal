@@ -32,6 +32,10 @@ pub enum PartKind {
 pub enum Wave {
     Sine { amp: f64, freq: f64 },
     Square { amp: f64, freq: f64, #[serde(default = "half")] duty: f64 },
+    /// Rises from -amp to +amp in the first half period, falls back in the second.
+    Triangle { amp: f64, freq: f64 },
+    /// Rises from -amp to +amp over each period, then jumps back.
+    Sawtooth { amp: f64, freq: f64 },
 }
 
 fn half() -> f64 { 0.5 }
@@ -41,6 +45,8 @@ impl Wave {
         match *self {
             Wave::Sine { amp, freq } => offset + amp * (std::f64::consts::TAU * freq * t).sin(),
             Wave::Square { amp, freq, duty } => offset + if (t * freq).fract() < duty { amp } else { -amp },
+            Wave::Triangle { amp, freq } => { let x = (t * freq).fract(); offset + amp * if x < 0.5 { 4.0 * x - 1.0 } else { 3.0 - 4.0 * x } }
+            Wave::Sawtooth { amp, freq } => offset + amp * (2.0 * (t * freq).fract() - 1.0),
         }
     }
 }

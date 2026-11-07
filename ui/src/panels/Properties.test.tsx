@@ -62,7 +62,7 @@ test('duty_cycle_shows_only_for_square_and_must_be_below_one', () => {
   setup(signal, 'engineer')
   expect(screen.queryByLabelText(/Duty/)).toBeNull()
   cleanup()
-  const built = setup({ ...signal, defaults: { ...signal.defaults, square: 1 } }, 'engineer')
+  const built = setup({ ...signal, defaults: { ...signal.defaults, shape: 1 } }, 'engineer')
   fireEvent.change(screen.getByLabelText(/Duty/), { target: { value: '0.25' } })
   expect(built().wave).toMatchObject({ shape: 'Square', duty: 0.25 })
   fireEvent.change(screen.getByLabelText(/Duty/), { target: { value: '1' } })

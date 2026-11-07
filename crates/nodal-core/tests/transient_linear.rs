@@ -97,6 +97,22 @@ fn square_source_flips_at_half_period_and_bad_freq_is_rejected() {
 }
 
 #[test]
+fn triangle_and_sawtooth_follow_their_shape_and_reject_bad_freq() {
+    use nodal_core::{SimError, Wave};
+    let mk = |w| Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 1.0, wave: Some(w) }),
+        part("R1", Resistor { a: n(1), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
+    ] };
+    // 100 Hz, 1 ms steps: 10 steps per period
+    let tri = transient(&mk(Wave::Triangle { amp: 2.0, freq: 100.0 }), 0.03, 0.001).unwrap();
+    for (k, want) in [(5, 3.0), (10, -1.0), (22, 0.6)] { assert!((tri.node_voltages[k][1] - want).abs() < 1e-9, "tri k={k}"); }
+    let saw = transient(&mk(Wave::Sawtooth { amp: 2.0, freq: 100.0 }), 0.01, 0.001).unwrap();
+    for (k, want) in [(5, 1.0), (9, 2.6)] { assert!((saw.node_voltages[k][1] - want).abs() < 1e-9, "saw k={k}"); }
+    assert!(matches!(transient(&mk(Wave::Triangle { amp: 1.0, freq: 0.0 }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
+    assert!(matches!(transient(&mk(Wave::Sawtooth { amp: f64::NAN, freq: 1.0 }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
+}
+
+#[test]
 fn square_duty_sets_the_high_fraction() {
     use nodal_core::{SimError, Wave};
     let mk = |duty| Circuit { parts: vec![

@@ -76,6 +76,18 @@ fn sine_and_pulse_sources_round_trip() {
 }
 
 #[test]
+fn triangle_and_sawtooth_round_trip_as_pulse() {
+    let c = Circuit { parts: vec![
+        part("V1", PartKind::VSource { pos: n(1), neg: n(0), volts: 1.0, wave: Some(Wave::Triangle { amp: 2.0, freq: 1000.0 }) }),
+        part("V2", PartKind::VSource { pos: n(2), neg: n(0), volts: 0.0, wave: Some(Wave::Sawtooth { amp: 3.0, freq: 500.0 }) }),
+        part("R1", PartKind::Resistor { a: n(1), b: n(2), ohms: 1e3, max_watts: 0.25 }),
+    ] };
+    let back = from_spice(&to_spice(&c)).unwrap();
+    assert!(matches!(back.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Triangle { amp, freq }), .. } if (volts - 1.0).abs() < 1e-9 && (amp - 2.0).abs() < 1e-9 && (freq - 1000.0).abs() < 1e-6));
+    assert!(matches!(back.parts[1].kind, PartKind::VSource { wave: Some(Wave::Sawtooth { amp, freq }), .. } if (amp - 3.0).abs() < 1e-9 && (freq - 500.0).abs() < 1e-6));
+}
+
+#[test]
 fn ids_with_their_type_letter_are_not_prefixed_again() {
     let c = Circuit { parts: vec![
         part("V1", PartKind::VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
