@@ -1,4 +1,4 @@
-use nodal_core::ac::ac_sweep;
+use nodal_core::ac::{ac_sweep, ac_sweep_multi, AcStimulus};
 use nodal_core::dc::dc_op;
 use nodal_core::mna::VT;
 use nodal_core::{Circuit, NodeId, Part, PartKind, PartKind::*, SimError};
@@ -135,4 +135,28 @@ fn zero_or_negative_reactive_values_are_rejected() {
         let c = Circuit { parts: vec![vs("V1", 1, 1.0), res("R1", 1, 2, 1000.0), part("C1", Capacitor { a: n(2), b: n(0), farads })] };
         assert!(matches!(ac_sweep(&c, "V1", 10.0, 1e3, 3), Err(SimError::InvalidInput(_))));
     }
+}
+
+fn stim(id: &str, amp: f64, phase_deg: f64) -> AcStimulus { AcStimulus { id: id.into(), amp, phase_deg } }
+
+#[test]
+fn two_sources_add_as_phasors_and_bad_lists_are_rejected() {
+    // V1 - R - node 2 - R - V2, equal resistors: node 2 is the average of the two source phasors.
+    let c = Circuit { parts: vec![vs("V1", 1, 0.0), vs("V2", 3, 0.0), res("R1", 1, 2, 1000.0), res("R2", 2, 3, 1000.0)] };
+    let at2 = |s: &[AcStimulus]| { let r = ac_sweep_multi(&c, s, 100.0, 1e3, 2).unwrap(); (r.magnitude[0][2], r.phase_deg[0][2]) };
+    let (m, _) = at2(&[stim("V1", 1.0, 0.0), stim("V2", 1.0, 180.0)]);
+    assert!(m < 1e-9, "opposite phases cancel, got {m}");
+    let (m, p) = at2(&[stim("V1", 1.0, 0.0), stim("V2", 1.0, 0.0)]);
+    assert!((m - 1.0).abs() < 1e-9 && p.abs() < 1e-9);
+    let (m, p) = at2(&[stim("V1", 1.0, 0.0), stim("V2", 2.0, 90.0)]); // (1 + 2j) / 2
+    assert!((m - 5f64.sqrt() / 2.0).abs() < 1e-9 && (p - 2f64.atan2(1.0).to_degrees()).abs() < 1e-6, "m={m} p={p}");
+    let (m, _) = at2(&[stim("V1", 3.0, 0.0), stim("V2", 0.0, 0.0)]); // zero amplitude = source off
+    assert!((m - 1.5).abs() < 1e-9);
+    let bad = |s: &[AcStimulus]| matches!(ac_sweep_multi(&c, s, 100.0, 1e3, 2), Err(SimError::InvalidInput(_)));
+    assert!(bad(&[]));
+    assert!(bad(&[stim("V1", 0.0, 0.0), stim("V2", 0.0, 0.0)]));
+    assert!(bad(&[stim("V1", 1.0, 0.0), stim("V1", 1.0, 0.0)]));
+    assert!(bad(&[stim("V1", f64::NAN, 0.0)]));
+    assert!(bad(&[stim("V1", 1.0, f64::INFINITY)]));
+    assert!(bad(&[stim("R1", 1.0, 0.0)]));
 }

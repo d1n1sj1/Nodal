@@ -37,14 +37,15 @@ function Plot({ freqs, ys, unit, label }: { freqs: number[]; ys: number[]; unit:
 }
 
 /** Gain (dB) and phase (degrees) of one node against frequency, log frequency axis. */
-export default function Bode({ output, node, kids = false }: { output: AcOutput; node: number; kids?: boolean }) {
+/** `level`: the stimulus is not a single 1 V source, so the plot is output volts in dBV, not gain. */
+export default function Bode({ output, node, kids = false, level = false }: { output: AcOutput; node: number; kids?: boolean; level?: boolean }) {
   if (output.freqs.length < 2) return null
   if (kids) return <Plot freqs={output.freqs} ys={output.magnitude.map((m) => (m[node] ?? 0) * 100)} unit="%" label="Loudness" /> // 100% = as loud as the wave going in
   const mag = output.magnitude.map((m) => toDb(m[node] ?? 0))
   const phase = output.phase_deg.map((p) => p[node] ?? 0)
   return (
     <div className="bode-plots">
-      <Plot freqs={output.freqs} ys={mag} unit="dB" label="Gain" />
+      <Plot freqs={output.freqs} ys={mag} unit={level ? 'dBV' : 'dB'} label={level ? 'Level' : 'Gain'} />
       <Plot freqs={output.freqs} ys={phase} unit="°" label="Phase" />
     </div>
   )

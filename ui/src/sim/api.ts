@@ -41,14 +41,17 @@ export const runSimulation = (c: CircuitJson, stop: number, step: number): Promi
 
 export interface AcOutput {
   freqs: number[]
-  /** [freq][node], volts for a 1 V stimulus */
+  /** [freq][node], volts for the stimuli sent (gain for a 1 V stimulus) */
   magnitude: number[][]
   /** [freq][node], degrees */
   phase_deg: number[][]
 }
 
-export const runAc = (c: CircuitJson, source: string, fStart: number, fStop: number, pointsPerDecade: number): Promise<AcOutput> =>
-  invoke<AcOutput>('run_ac', { circuitJson: JSON.stringify(c), source, fStart, fStop, pointsPerDecade })
+/** One voltage source driven at AC: peak volts and phase in degrees. */
+export interface AcStimulus { id: string; amp: number; phase_deg: number }
+
+export const runAc = (c: CircuitJson, stimuli: AcStimulus[], fStart: number, fStop: number, pointsPerDecade: number): Promise<AcOutput> =>
+  invoke<AcOutput>('run_ac', { circuitJson: JSON.stringify(c), stimuli, fStart, fStop, pointsPerDecade })
 
 export const saveCircuit = (path: string, c: CircuitJson): Promise<void> =>
   invoke<void>('save_circuit', { path, circuitJson: JSON.stringify(c) })

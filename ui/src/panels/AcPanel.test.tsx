@@ -30,7 +30,7 @@ test('sweep sends the chosen source and parsed frequencies, then draws the plots
   await waitFor(() => expect(screen.getByRole('img', { name: 'Gain' })).toBeTruthy())
   const [cmd, args] = invoke.mock.calls[0]
   expect(cmd).toBe('run_ac')
-  expect(args).toMatchObject({ source: 'p1', fStart: 10, fStop: 1000, pointsPerDecade: 20 })
+  expect(args).toMatchObject({ stimuli: [{ id: 'p1', amp: 1, phase_deg: 0 }], fStart: 10, fStop: 1000, pointsPerDecade: 20 })
 })
 
 test('bad frequencies and a missing source are explained without calling the core', async () => {
@@ -62,7 +62,7 @@ test('kids sweep hides the numbers, picks the Wave tile and draws loudness', asy
   expect(screen.queryByLabelText('Start frequency')).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: 'Sweep pitches' }))
   await waitFor(() => expect(screen.getByRole('img', { name: 'Loudness' })).toBeTruthy())
-  expect(invoke.mock.calls[0][1]).toMatchObject({ source: 'p2', fStart: 10, fStop: 100000, pointsPerDecade: 20 })
+  expect(invoke.mock.calls[0][1]).toMatchObject({ stimuli: [{ id: 'p2', amp: 1, phase_deg: 0 }], fStart: 10, fStop: 100000, pointsPerDecade: 20 })
   expect(screen.queryByRole('img', { name: 'Phase' })).toBeNull()
 })
 
@@ -71,4 +71,30 @@ test('kids core error is put in plain words', async () => {
   render(<AcPanel schematic={rc()} mode="kids" />)
   fireEvent.click(screen.getByRole('button', { name: 'Sweep pitches' }))
   await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/got confused/))
+})
+
+test('two sources are sent with their amplitudes and phases and the plot is labelled in dBV', async () => {
+  invoke.mockResolvedValue({ freqs: [10, 100], magnitude: [[0, 1, 1], [0, 1, 0.5]], phase_deg: [[0, 0, -5], [0, 0, -45]] })
+  let s = ['VSource', 'VSource', 'Resistor', 'Ground'].reduce((acc, k) => addPart(acc, k, at), emptySchematic())
+  s = addWire(s, { part: 'p1', pin: 0 }, { part: 'p3', pin: 0 })
+  s = addWire(s, { part: 'p2', pin: 0 }, { part: 'p3', pin: 1 })
+  s = addWire(s, { part: 'p1', pin: 1 }, { part: 'p4', pin: 0 })
+  s = addWire(s, { part: 'p2', pin: 1 }, { part: 'p4', pin: 0 })
+  render(<AcPanel schematic={s} />)
+  fireEvent.change(screen.getByLabelText('p2 AC amplitude'), { target: { value: '2' } })
+  fireEvent.change(screen.getByLabelText('p2 AC phase'), { target: { value: '90' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Sweep' }))
+  await waitFor(() => expect(screen.getByRole('img', { name: 'Level' })).toBeTruthy())
+  expect(invoke.mock.calls[0][1].stimuli).toEqual([{ id: 'p1', amp: 1, phase_deg: 0 }, { id: 'p2', amp: 2, phase_deg: 90 }])
+})
+
+test('all-zero or non-numeric amplitudes are explained without calling the core', async () => {
+  render(<AcPanel schematic={rc()} />)
+  fireEvent.change(screen.getByLabelText('p1 AC amplitude'), { target: { value: '0' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Sweep' }))
+  expect((await screen.findByRole('alert')).textContent).toMatch(/other than zero/)
+  fireEvent.change(screen.getByLabelText('p1 AC amplitude'), { target: { value: 'x' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Sweep' }))
+  await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/must be numbers/))
+  expect(invoke).not.toHaveBeenCalled()
 })

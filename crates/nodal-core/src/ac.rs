@@ -1,13 +1,14 @@
 use crate::dc::{dc_op, validate};
 use crate::mna::{linearize, Stamper};
 use crate::{Circuit, PartKind::*, SimError};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Result of an AC sweep: node voltages for a 1 V AC source, per frequency.
+/// Result of an AC sweep: node voltages for the AC stimuli (1 V for `ac_sweep`), per frequency.
 #[derive(Debug, Clone)]
 pub struct AcResult {
     pub freqs: Vec<f64>,
-    /// [freq][node] in volts (= gain from the source); node 0 = ground = 0.0
+    /// [freq][node] in volts (= gain for a 1 V stimulus); node 0 = ground = 0.0
     pub magnitude: Vec<Vec<f64>>,
     /// [freq][node] in degrees, -180..180
     pub phase_deg: Vec<Vec<f64>>,
@@ -16,10 +17,24 @@ pub struct AcResult {
 const MAX_POINTS: f64 = 20_000.0;
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
 
-/// Small-signal frequency sweep. Solves the DC operating point, linearises every part around it, then for each
-/// frequency solves the complex system with voltage source `source` as a 1 V AC stimulus (all other sources
-/// zero). `points_per_decade` points per decade from `f_start` to `f_stop` inclusive, log spaced.
+/// One voltage source driven at AC: peak `amp` volts at `phase_deg` degrees.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AcStimulus {
+    pub id: String,
+    pub amp: f64,
+    pub phase_deg: f64,
+}
+
+/// `ac_sweep_multi` with voltage source `source` as the only stimulus, 1 V at 0 degrees.
 pub fn ac_sweep(c: &Circuit, source: &str, f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcResult, SimError> {
+    ac_sweep_multi(c, &[AcStimulus { id: source.into(), amp: 1.0, phase_deg: 0.0 }], f_start, f_stop, points_per_decade)
+}
+
+/// Small-signal frequency sweep. Solves the DC operating point, linearises every part around it, then for each
+/// frequency solves the complex system with every voltage source in `stimuli` driven at once (all other sources
+/// zero), so the result is the sum of their responses. `points_per_decade` points per decade from `f_start` to
+/// `f_stop` inclusive, log spaced.
+pub fn ac_sweep_multi(c: &Circuit, stimuli: &[AcStimulus], f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcResult, SimError> {
     validate(c)?;
     if !(f_start.is_finite() && f_start > 0.0 && f_stop.is_finite() && f_stop > f_start) {
         return Err(SimError::InvalidInput("AC start and stop frequencies must be finite, above zero, and start below stop".into()));
@@ -31,8 +46,20 @@ pub fn ac_sweep(c: &Circuit, source: &str, f_start: f64, f_stop: f64, points_per
     if decades * points_per_decade as f64 + 1.0 > MAX_POINTS {
         return Err(SimError::InvalidInput("AC sweep would need more than 20,000 points; use fewer points per decade".into()));
     }
-    if !c.parts.iter().any(|p| p.id == source && matches!(p.kind, VSource { .. })) {
-        return Err(SimError::InvalidInput(format!("AC source \"{source}\" is not a voltage source in this circuit")));
+    for (i, s) in stimuli.iter().enumerate() {
+        let id = &s.id;
+        if !c.parts.iter().any(|p| p.id == *id && matches!(p.kind, VSource { .. })) {
+            return Err(SimError::InvalidInput(format!("AC source \"{id}\" is not a voltage source in this circuit")));
+        }
+        if !(s.amp.is_finite() && s.phase_deg.is_finite()) {
+            return Err(SimError::InvalidInput(format!("AC source \"{id}\" needs a finite amplitude and phase")));
+        }
+        if stimuli[..i].iter().any(|o| o.id == *id) {
+            return Err(SimError::InvalidInput(format!("AC source \"{id}\" is listed twice")));
+        }
+    }
+    if !stimuli.iter().any(|s| s.amp != 0.0) {
+        return Err(SimError::InvalidInput("AC sweep needs at least one source with a nonzero amplitude".into()));
     }
     let op = dc_op(c)?.node_voltages;
     let n = c.node_count();
@@ -71,7 +98,11 @@ pub fn ac_sweep(c: &Circuit, source: &str, f_start: f64, f_stop: f64, points_per
     let mut base: Vec<(usize, usize, f64)> = Vec::with_capacity(2 * g.entries().len());
     for &(r, col, v) in g.entries() { base.extend([(r, col, v), (r + size, col + size, v)]); }
     let mut rhs = vec![0.0; 2 * size];
-    rhs[n - 1 + branch_of[source]] = 1.0;
+    for s in stimuli {
+        let (sin, cos) = s.phase_deg.to_radians().sin_cos();
+        let row = n - 1 + branch_of[s.id.as_str()];
+        (rhs[row], rhs[row + size]) = (s.amp * cos, s.amp * sin);
+    }
     let mut order = None;
 
     let points = (decades * points_per_decade as f64).ceil() as usize + 1;

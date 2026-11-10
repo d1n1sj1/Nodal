@@ -1,5 +1,5 @@
 //! Thin wrappers over nodal-core; no solver logic here.
-use nodal_core::ac::ac_sweep;
+use nodal_core::ac::{ac_sweep_multi, AcStimulus};
 use nodal_core::spice::{from_spice, to_spice};
 use nodal_core::transient::transient;
 use nodal_core::{check_damage, Circuit, DamageWarning};
@@ -36,9 +36,9 @@ pub struct AcOutput {
     pub phase_deg: Vec<Vec<f64>>,
 }
 
-pub fn run_ac_impl(circuit_json: &str, source: &str, f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcOutput, String> {
+pub fn run_ac_impl(circuit_json: &str, stimuli: &[AcStimulus], f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcOutput, String> {
     let c = Circuit::from_json(circuit_json).map_err(|e| e.to_string())?;
-    let r = ac_sweep(&c, source, f_start, f_stop, points_per_decade).map_err(|e| e.to_string())?;
+    let r = ac_sweep_multi(&c, stimuli, f_start, f_stop, points_per_decade).map_err(|e| e.to_string())?;
     Ok(AcOutput { freqs: r.freqs, magnitude: r.magnitude, phase_deg: r.phase_deg })
 }
 
@@ -80,8 +80,8 @@ pub fn run_simulation(circuit_json: String, stop: f64, step: f64) -> Result<SimO
 }
 
 #[tauri::command(async)]
-pub fn run_ac(circuit_json: String, source: String, f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcOutput, String> {
-    run_ac_impl(&circuit_json, &source, f_start, f_stop, points_per_decade)
+pub fn run_ac(circuit_json: String, stimuli: Vec<AcStimulus>, f_start: f64, f_stop: f64, points_per_decade: u32) -> Result<AcOutput, String> {
+    run_ac_impl(&circuit_json, &stimuli, f_start, f_stop, points_per_decade)
 }
 
 /// `path` always comes from the native dialog plugin (the UI never builds paths itself).
