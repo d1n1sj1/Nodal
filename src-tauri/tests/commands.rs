@@ -116,3 +116,12 @@ fn load_circuit_malformed_files_error_without_panic() {
         assert!(r.is_ok(), "{name} panicked");
     }
 }
+
+#[test]
+fn extra_top_level_fields_such_as_ac_setup_survive_save_and_load() {
+    let json = r#"{"version":1,"parts":[{"id":"V1","kind":"VSource","pos":1,"neg":0,"volts":5}],"ac":{"V1":{"amp":"2","phase":"90"}}}"#;
+    let p = tmp("ac.json");
+    save_circuit(p.clone(), json.into()).unwrap();
+    assert_eq!(load_circuit(p.clone()).unwrap(), json);
+    std::fs::remove_file(&p).ok();
+}

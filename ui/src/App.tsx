@@ -18,7 +18,7 @@ import WarningBanner from './panels/WarningBanner'
 import { damagedIds } from './panels/warningText'
 import { glowLevels } from './panels/glow'
 import { getCurrentWindow } from '@tauri-apps/api/window'
-import { loadCircuit, saveCircuit, type SimOutput } from './sim/api'
+import { loadCircuit, saveCircuit, cleanAc, type AcSetup, type SimOutput } from './sim/api'
 import './modes/theme.css'
 
 const filters = [{ name: 'Nodal circuit', extensions: ['json'] }, { name: 'SPICE netlist', extensions: ['cir', 'sp'] }]
@@ -35,6 +35,8 @@ function App() {
   const [node, setNode] = useState<number | null>(null)
   const [cursor, setCursor] = useState<number | null>(null)
   const [partId, setPartId] = useState<string | null>(null)
+  const acSetup = useRef<AcSetup>({})
+  const [acInitial, setAcInitial] = useState<{ n: number; setup: AcSetup }>({ n: 0, setup: {} }) // n re-mounts the AC panel on Open
   // Result node indices and warnings belong to the schematic that was run.
   useEffect(() => setResult(null), [schematic])
   const part = schematic.parts.find((p) => p.id === partId)
@@ -71,7 +73,7 @@ function App() {
   const onSave = async () => {
     try {
       const path = await save({ filters })
-      if (path) { await saveCircuit(path, buildCircuit(schematic)); saved.current = schematic }
+      if (path) { await saveCircuit(path, { ...buildCircuit(schematic), ac: acSetup.current }); saved.current = schematic }
       setError(null)
     } catch (e) {
       setError(`Could not save the circuit: ${message(e)}`)
@@ -82,7 +84,11 @@ function App() {
       if (dirty && !(await confirmDiscard())) return
       const path = await open({ multiple: false, filters })
       if (typeof path === 'string') {
-        const loaded = schematicFromCircuit(await loadCircuit(path))
+        const file = await loadCircuit(path)
+        const loaded = schematicFromCircuit(file)
+        const ac = cleanAc(file.ac)
+        acSetup.current = ac
+        setAcInitial((a) => ({ n: a.n + 1, setup: ac }))
         setSchematic(loaded)
         saved.current = loaded
       }
@@ -121,7 +127,7 @@ function App() {
           {part && <Properties key={part.id} part={part} mode={mode} onChange={(v) => setSchematic((s) => updateValues(s, part.id, v))} />}
           <WarningBanner warnings={result?.warnings} mode={mode} schematic={schematic} />
           <RunBar schematic={schematic} mode={mode} onResult={(o) => { setResult(o); setCursor(null) }} />
-          <AcPanel schematic={schematic} mode={mode} />
+          <AcPanel key={acInitial.n} schematic={schematic} mode={mode} initial={acInitial.setup} onEdit={(s) => { acSetup.current = s }} />
           {result && (
             <section className="results">
               <label>Node{' '}

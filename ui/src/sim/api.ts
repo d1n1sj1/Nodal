@@ -17,9 +17,25 @@ export type PartJson = { id: string } & (
   | { kind: 'Bjt'; c: NodeId; b: NodeId; e: NodeId; pnp: boolean; beta: number; max_amps: number }
 )
 
+/** AC sweep amplitude and phase text per voltage source id; saved beside the parts, ignored by the core. */
+export type AcSetup = Record<string, { amp?: string; phase?: string }>
+
+/** Keeps only string amp/phase entries of a loaded file's `ac`; anything else in an edited file is dropped. */
+export function cleanAc(raw: unknown): AcSetup {
+  const out: AcSetup = {}
+  if (raw && typeof raw === 'object') {
+    for (const [id, v] of Object.entries(raw)) {
+      const { amp, phase } = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>
+      out[id] = { ...(typeof amp === 'string' && { amp }), ...(typeof phase === 'string' && { phase }) }
+    }
+  }
+  return out
+}
+
 export interface CircuitJson {
   version: 1
   parts: PartJson[]
+  ac?: AcSetup
 }
 
 export interface DamageWarning {

@@ -98,3 +98,12 @@ test('all-zero or non-numeric amplitudes are explained without calling the core'
   await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/must be numbers/))
   expect(invoke).not.toHaveBeenCalled()
 })
+
+test('starts from the saved setup and reports edits', () => {
+  const onEdit = vi.fn()
+  render(<AcPanel schematic={rc()} initial={{ p1: { amp: '3', phase: '45' } }} onEdit={onEdit} />)
+  expect((screen.getByLabelText('p1 AC amplitude') as HTMLInputElement).value).toBe('3')
+  expect((screen.getByLabelText('p1 AC phase') as HTMLInputElement).value).toBe('45')
+  fireEvent.change(screen.getByLabelText('p1 AC phase'), { target: { value: '90' } })
+  expect(onEdit).toHaveBeenLastCalledWith({ p1: { amp: '3', phase: '90' } })
+})
