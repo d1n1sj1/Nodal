@@ -7,7 +7,7 @@ export type PartJson = { id: string } & (
   | { kind: 'Resistor'; a: NodeId; b: NodeId; ohms: number; max_watts: number }
   | { kind: 'Capacitor'; a: NodeId; b: NodeId; farads: number }
   | { kind: 'Inductor'; a: NodeId; b: NodeId; henries: number }
-  | { kind: 'VSource'; pos: NodeId; neg: NodeId; volts: number; wave?: { shape: 'Sine' | 'Square' | 'Triangle' | 'Sawtooth'; amp: number; freq: number; duty?: number } }
+  | { kind: 'VSource'; pos: NodeId; neg: NodeId; volts: number; wave?: { shape: 'Sine' | 'Square' | 'Triangle' | 'Sawtooth'; amp: number; freq: number; duty?: number; phase?: number } }
   | { kind: 'ISource'; from: NodeId; to: NodeId; amps: number }
   | { kind: 'Diode'; anode: NodeId; cathode: NodeId }
   | { kind: 'Led'; anode: NodeId; cathode: NodeId; max_amps: number }

@@ -74,7 +74,7 @@ fn step_must_be_positive() {
 fn sine_source_drives_a_resistor_divider() {
     use nodal_core::Wave;
     let c = Circuit { parts: vec![
-        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 1.0, wave: Some(Wave::Sine { amp: 2.0, freq: 100.0 }) } },
+        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 1.0, wave: Some(Wave::Sine { amp: 2.0, freq: 100.0, phase: 0.0 }) } },
         Part { id: "R1".into(), kind: Resistor { a: NodeId(1), b: NodeId(0), ohms: 1000.0, max_watts: 1.0 } },
     ] };
     let r = transient(&c, 0.01, 0.0001).unwrap();
@@ -87,7 +87,7 @@ fn sine_source_drives_a_resistor_divider() {
 fn square_source_flips_at_half_period_and_bad_freq_is_rejected() {
     use nodal_core::{SimError, Wave};
     let mk = |freq| Circuit { parts: vec![
-        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 0.0, wave: Some(Wave::Square { amp: 3.0, freq, duty: 0.5 }) } },
+        Part { id: "V1".into(), kind: VSource { pos: NodeId(1), neg: NodeId(0), volts: 0.0, wave: Some(Wave::Square { amp: 3.0, freq, duty: 0.5, phase: 0.0 }) } },
         Part { id: "R1".into(), kind: Resistor { a: NodeId(1), b: NodeId(0), ohms: 1000.0, max_watts: 1.0 } },
     ] };
     let r = transient(&mk(100.0), 0.01, 0.001).unwrap();
@@ -104,23 +104,41 @@ fn triangle_and_sawtooth_follow_their_shape_and_reject_bad_freq() {
         part("R1", Resistor { a: n(1), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
     ] };
     // 100 Hz, 1 ms steps: 10 steps per period
-    let tri = transient(&mk(Wave::Triangle { amp: 2.0, freq: 100.0 }), 0.03, 0.001).unwrap();
+    let tri = transient(&mk(Wave::Triangle { amp: 2.0, freq: 100.0, phase: 0.0 }), 0.03, 0.001).unwrap();
     for (k, want) in [(5, 3.0), (10, -1.0), (22, 0.6)] { assert!((tri.node_voltages[k][1] - want).abs() < 1e-9, "tri k={k}"); }
-    let saw = transient(&mk(Wave::Sawtooth { amp: 2.0, freq: 100.0 }), 0.01, 0.001).unwrap();
+    let saw = transient(&mk(Wave::Sawtooth { amp: 2.0, freq: 100.0, phase: 0.0 }), 0.01, 0.001).unwrap();
     for (k, want) in [(5, 1.0), (9, 2.6)] { assert!((saw.node_voltages[k][1] - want).abs() < 1e-9, "saw k={k}"); }
-    assert!(matches!(transient(&mk(Wave::Triangle { amp: 1.0, freq: 0.0 }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
-    assert!(matches!(transient(&mk(Wave::Sawtooth { amp: f64::NAN, freq: 1.0 }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
+    assert!(matches!(transient(&mk(Wave::Triangle { amp: 1.0, freq: 0.0, phase: 0.0 }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
+    assert!(matches!(transient(&mk(Wave::Sawtooth { amp: f64::NAN, freq: 1.0, phase: 0.0 }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
 }
 
 #[test]
 fn square_duty_sets_the_high_fraction() {
     use nodal_core::{SimError, Wave};
     let mk = |duty| Circuit { parts: vec![
-        part("V1", VSource { pos: n(1), neg: n(0), volts: 0.0, wave: Some(Wave::Square { amp: 1.0, freq: 100.0, duty }) }),
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 0.0, wave: Some(Wave::Square { amp: 1.0, freq: 100.0, duty, phase: 0.0 }) }),
         part("R1", Resistor { a: n(1), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
     ] };
     let r = transient(&mk(0.2), 0.01, 0.001).unwrap();
     let high = r.node_voltages.iter().skip(1).take(10).filter(|v| v[1] > 0.0).count();
     assert_eq!(high, 2); // 10 steps in one period, 20% high
     for d in [0.0, 1.0] { assert!(matches!(transient(&mk(d), 0.01, 0.001), Err(SimError::InvalidInput(_)))); }
+}
+
+#[test]
+fn phase_advances_every_shape_and_must_be_finite() {
+    use nodal_core::{SimError, Wave};
+    let mk = |w| Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 0.0, wave: Some(w) }),
+        part("R1", Resistor { a: n(1), b: n(0), ohms: 1000.0, max_watts: 1.0 }),
+    ] };
+    // 100 Hz, 1 ms steps: 10 steps per period, so 36 degrees is one step; k = 0 is the at-rest sample
+    let sine = transient(&mk(Wave::Sine { amp: 1.0, freq: 100.0, phase: 90.0 }), 0.01, 0.001).unwrap();
+    assert!((sine.node_voltages[1][1] - (std::f64::consts::TAU * 0.35).sin()).abs() < 1e-9); // 90 + 36 degrees
+    let saw = transient(&mk(Wave::Sawtooth { amp: 2.0, freq: 100.0, phase: 180.0 }), 0.01, 0.001).unwrap();
+    assert!((saw.node_voltages[2][1] - 0.8).abs() < 1e-9); // x = 0.2 + 0.5 = 0.7 -> 2 * (2 * 0.7 - 1)
+    let sq = transient(&mk(Wave::Square { amp: 1.0, freq: 100.0, duty: 0.5, phase: -90.0 }), 0.01, 0.001).unwrap();
+    assert_eq!(sq.node_voltages[2][1], -1.0); // x = 0.2 - 0.25 wraps to 0.95: low
+    assert_eq!(sq.node_voltages[6][1], 1.0); // x = 0.6 - 0.25 = 0.35: high
+    assert!(matches!(transient(&mk(Wave::Sine { amp: 1.0, freq: 100.0, phase: f64::NAN }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
 }

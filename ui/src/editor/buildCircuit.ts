@@ -55,8 +55,8 @@ function solve(s: Schematic): { parts: PartJson[]; pins: Map<string, number> } {
       if (b.kind === 'Switch') vals.closed = vals.closed !== 0
       if ('shape' in vals) { // signal source: amp/freq/shape fold into the core's `wave`
         const shape = WAVE_SHAPES[vals.shape as number]
-        vals.wave = { shape, amp: vals.amp, freq: vals.freq, ...(shape === 'Square' && { duty: vals.duty }) } as never
-        delete vals.amp; delete vals.freq; delete vals.shape; delete vals.duty
+        vals.wave = { shape, amp: vals.amp, freq: vals.freq, phase: vals.phase ?? 0, ...(shape === 'Square' && { duty: vals.duty }) } as never
+        delete vals.amp; delete vals.freq; delete vals.shape; delete vals.duty; delete vals.phase
       }
       if (b.kind === 'Bjt') vals.pnp = vals.pnp !== 0
       if (b.kind === 'Mosfet') vals.pmos = vals.pmos !== 0

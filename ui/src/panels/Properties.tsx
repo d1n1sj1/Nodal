@@ -8,13 +8,13 @@ import { formatSI, parseSI } from './formatSI'
 const LABELS: Record<string, string> = {
   ohms: 'Resistance (Ω)', max_watts: 'Max power (W)', farads: 'Capacitance (F)', henries: 'Inductance (H)',
   volts: 'Voltage (V)', amps: 'Current (A)', max_amps: 'Max current (A)', beta: 'Current gain (β)',
-  duty: 'Duty cycle (0 to 1)', amp: 'Amplitude (V)', freq: 'Frequency (Hz)', vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)', gain: 'Gain (V/V)', vsat: 'Output limit (V)',
+  duty: 'Duty cycle (0 to 1)', amp: 'Amplitude (V)', freq: 'Frequency (Hz)', phase: 'Phase (°)', vth: 'Threshold voltage (V)', kp: 'Transconductance (A/V²)', gain: 'Gain (V/V)', vsat: 'Output limit (V)',
 }
 const KIDS_LABELS: Record<string, string> = {
   ohms: 'resistance (ohms)', max_watts: 'power limit (watts)', farads: 'farads', henries: 'henries',
-  volts: 'volts', amps: 'amps', duty: 'on-time (0 to 1)', amp: 'swing (volts)', freq: 'beats per second', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength', gain: 'gain', vsat: 'output limit (volts)',
+  volts: 'volts', amps: 'amps', duty: 'on-time (0 to 1)', amp: 'swing (volts)', freq: 'beats per second', phase: 'head start (degrees)', max_amps: 'current limit (amps)', beta: 'gain', vth: 'turn-on volts', kp: 'strength', gain: 'gain', vsat: 'output limit (volts)',
 }
-const SIGNED = ['volts', 'amps'] // sources may be negative or zero; every other value must be > 0
+const SIGNED = ['volts', 'amps', 'phase'] // sources may be negative or zero; every other value must be > 0
 const valid = (k: string, v: number) => Number.isFinite(v) && (SIGNED.includes(k) || v > 0) && (k !== 'duty' || v < 1)
 
 /** Exact text for a value: SI form when it parses back to the same number, else plain. */

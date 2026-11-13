@@ -68,8 +68,8 @@ fn sine_and_pulse_sources_round_trip() {
     use nodal_core::Wave;
     let text = "t\nV1 1 0 SIN(1 2 1k)\nV2 2 0 PULSE(0 5 0 1n 1n 0.5m 1m)\nV3 3 0 PULSE(0 1 0 0 0 0.2m 1m)\nR1 1 2 1k\n.end\n";
     let c = from_spice(text).unwrap();
-    assert!(matches!(c.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Sine { amp, freq }), .. } if volts == 1.0 && amp == 2.0 && freq == 1000.0));
-    assert!(matches!(c.parts[1].kind, PartKind::VSource { volts, wave: Some(Wave::Square { amp, freq, duty }), .. } if volts == 2.5 && amp == 2.5 && (freq - 1000.0).abs() < 1e-9 && (duty - 0.5).abs() < 1e-9));
+    assert!(matches!(c.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Sine { amp, freq, .. }), .. } if volts == 1.0 && amp == 2.0 && freq == 1000.0));
+    assert!(matches!(c.parts[1].kind, PartKind::VSource { volts, wave: Some(Wave::Square { amp, freq, duty, .. }), .. } if volts == 2.5 && amp == 2.5 && (freq - 1000.0).abs() < 1e-9 && (duty - 0.5).abs() < 1e-9));
     assert!(matches!(c.parts[2].kind, PartKind::VSource { wave: Some(Wave::Square { duty, .. }), .. } if (duty - 0.2).abs() < 1e-9));
     assert_eq!(from_spice(&to_spice(&c)).unwrap().parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>(), c.parts.iter().map(|p| p.kind.clone()).collect::<Vec<_>>());
     assert!(from_spice("t\nV1 1 0 SIN(1 2)\nR1 1 0 1\n").is_err());
@@ -78,13 +78,13 @@ fn sine_and_pulse_sources_round_trip() {
 #[test]
 fn triangle_and_sawtooth_round_trip_as_pulse() {
     let c = Circuit { parts: vec![
-        part("V1", PartKind::VSource { pos: n(1), neg: n(0), volts: 1.0, wave: Some(Wave::Triangle { amp: 2.0, freq: 1000.0 }) }),
-        part("V2", PartKind::VSource { pos: n(2), neg: n(0), volts: 0.0, wave: Some(Wave::Sawtooth { amp: 3.0, freq: 500.0 }) }),
+        part("V1", PartKind::VSource { pos: n(1), neg: n(0), volts: 1.0, wave: Some(Wave::Triangle { amp: 2.0, freq: 1000.0, phase: 0.0 }) }),
+        part("V2", PartKind::VSource { pos: n(2), neg: n(0), volts: 0.0, wave: Some(Wave::Sawtooth { amp: 3.0, freq: 500.0, phase: 0.0 }) }),
         part("R1", PartKind::Resistor { a: n(1), b: n(2), ohms: 1e3, max_watts: 0.25 }),
     ] };
     let back = from_spice(&to_spice(&c)).unwrap();
-    assert!(matches!(back.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Triangle { amp, freq }), .. } if (volts - 1.0).abs() < 1e-9 && (amp - 2.0).abs() < 1e-9 && (freq - 1000.0).abs() < 1e-6));
-    assert!(matches!(back.parts[1].kind, PartKind::VSource { wave: Some(Wave::Sawtooth { amp, freq }), .. } if (amp - 3.0).abs() < 1e-9 && (freq - 500.0).abs() < 1e-6));
+    assert!(matches!(back.parts[0].kind, PartKind::VSource { volts, wave: Some(Wave::Triangle { amp, freq, .. }), .. } if (volts - 1.0).abs() < 1e-9 && (amp - 2.0).abs() < 1e-9 && (freq - 1000.0).abs() < 1e-6));
+    assert!(matches!(back.parts[1].kind, PartKind::VSource { wave: Some(Wave::Sawtooth { amp, freq, .. }), .. } if (amp - 3.0).abs() < 1e-9 && (freq - 500.0).abs() < 1e-6));
 }
 
 #[test]
@@ -107,4 +107,25 @@ fn v_source_with_no_value_is_an_error_not_a_panic() {
 fn mosfet_model_without_vto_imports_and_solves() {
     let c = from_spice("t\nV1 1 0 5\nV2 2 0 3\nR1 1 3 1k\nM1 3 2 0 0 mn\n.model mn nmos (kp=1e-3)\n").unwrap();
     assert!(nodal_core::dc::dc_op(&c).is_ok());
+}
+
+#[test]
+fn wave_phase_round_trips_for_every_shape() {
+    let w = |shape: usize| [
+        Wave::Sine { amp: 2.0, freq: 1000.0, phase: 90.0 },
+        Wave::Square { amp: 2.0, freq: 1000.0, duty: 0.25, phase: 90.0 },
+        Wave::Triangle { amp: 2.0, freq: 1000.0, phase: 90.0 },
+        Wave::Sawtooth { amp: 2.0, freq: 1000.0, phase: 90.0 },
+    ][shape];
+    for k in 0..4 {
+        let c = Circuit { parts: vec![
+            part("V1", PartKind::VSource { pos: n(1), neg: n(0), volts: 1.0, wave: Some(w(k)) }),
+            part("R1", PartKind::Resistor { a: n(1), b: n(0), ohms: 1e3, max_watts: 0.25 }),
+        ] };
+        let back = from_spice(&to_spice(&c)).unwrap();
+        let PartKind::VSource { wave: Some(got), .. } = &back.parts[0].kind else { panic!("no wave") };
+        let phase = match got { Wave::Sine { phase, .. } | Wave::Square { phase, .. } | Wave::Triangle { phase, .. } | Wave::Sawtooth { phase, .. } => *phase };
+        assert!((phase - 90.0).abs() < 1e-6, "shape {k} phase {phase}");
+        assert_eq!(std::mem::discriminant(got), std::mem::discriminant(&w(k)));
+    }
 }

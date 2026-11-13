@@ -43,12 +43,15 @@ pub fn to_spice(c: &Circuit) -> String {
             Capacitor { a, b, farads } => out += &format!("{nm} {} {} {farads:e}\n", a.0, b.0),
             Inductor { a, b, henries } => out += &format!("{nm} {} {} {henries:e}\n", a.0, b.0),
             VSource { pos, neg, volts, wave } => {
+                // a phase advance is a PULSE delay of the rest of the period; SPICE holds the low level until then, so the first partial period differs from Nodal's
+                let td = |phase: f64, freq: f64| match (phase / 360.0).rem_euclid(1.0) { f if f == 0.0 => 0.0, f => (1.0 - f) / freq };
                 let w = match wave {
                     None => format!("DC {volts:e}"),
-                    Some(Wave::Sine { amp, freq }) => format!("SIN({volts:e} {amp:e} {freq:e})"),
-                    Some(Wave::Square { amp, freq, duty }) => format!("PULSE({:e} {:e} 0 0 0 {:e} {:e})", volts - amp, volts + amp, duty / freq, 1.0 / freq),
-                    Some(Wave::Triangle { amp, freq }) => format!("PULSE({:e} {:e} 0 {:e} {:e} 0 {:e})", volts - amp, volts + amp, 0.5 / freq, 0.5 / freq, 1.0 / freq),
-                    Some(Wave::Sawtooth { amp, freq }) => format!("PULSE({:e} {:e} 0 {:e} 0 0 {:e})", volts - amp, volts + amp, 1.0 / freq, 1.0 / freq),
+                    Some(Wave::Sine { amp, freq, phase }) if *phase == 0.0 => format!("SIN({volts:e} {amp:e} {freq:e})"),
+                    Some(Wave::Sine { amp, freq, phase }) => format!("SIN({volts:e} {amp:e} {freq:e} 0 0 {phase:e})"),
+                    Some(Wave::Square { amp, freq, duty, phase }) => format!("PULSE({:e} {:e} {:e} 0 0 {:e} {:e})", volts - amp, volts + amp, td(*phase, *freq), duty / freq, 1.0 / freq),
+                    Some(Wave::Triangle { amp, freq, phase }) => format!("PULSE({:e} {:e} {:e} {:e} {:e} 0 {:e})", volts - amp, volts + amp, td(*phase, *freq), 0.5 / freq, 0.5 / freq, 1.0 / freq),
+                    Some(Wave::Sawtooth { amp, freq, phase }) => format!("PULSE({:e} {:e} {:e} {:e} 0 0 {:e})", volts - amp, volts + amp, td(*phase, *freq), 1.0 / freq, 1.0 / freq),
                 };
                 out += &format!("{nm} {} {} {w}\n", pos.0, neg.0)
             }
@@ -131,14 +134,16 @@ pub fn from_spice(text: &str) -> Result<Circuit, SimError> {
                 let u: Vec<&str> = l.split(['(', ')', ' ', '\t']).filter(|s| !s.is_empty()).collect();
                 let arg = |k: usize| num(u.get(k).ok_or_else(|| bad(*n, format!("{name} has too few waveform values")))?);
                 let (volts, wave) = match u.get(3).ok_or_else(|| bad(*n, format!("{name} has no value")))?.to_ascii_lowercase().as_str() {
-                    "sin" => (arg(4)?, Some(Wave::Sine { amp: arg(5)?, freq: arg(6)? })),
-                    // shortcut: a PULSE with no flat top and a symmetric (triangle) or one-sided (sawtooth) edge pair is read as that wave; any other PULSE becomes an ideal square (duty = width / period) and delay and rise/fall times are dropped, upgrade when they are modelled
+                    "sin" => (arg(4)?, Some(Wave::Sine { amp: arg(5)?, freq: arg(6)?, phase: if u.get(9).is_some() { arg(9)? } else { 0.0 } })), // SIN(vo va freq td theta phase): td and theta are dropped
+                    // shortcut: a PULSE with no flat top and a symmetric (triangle) or one-sided (sawtooth) edge pair is read as that wave; any other PULSE becomes an ideal square (duty = width / period) and a delay becomes a phase advance, rise/fall times are dropped, upgrade when they are modelled
                     "pulse" => {
-                        let (v1, v2, tr, tf, pw, per) = (arg(4)?, arg(5)?, arg(7)?, arg(8)?, arg(9)?, arg(10)?);
+                        let (v1, v2, td, tr, tf, pw, per) = (arg(4)?, arg(5)?, arg(6)?, arg(7)?, arg(8)?, arg(9)?, arg(10)?);
                         let (amp, freq, eq) = ((v2 - v1) / 2.0, 1.0 / per, |a: f64, b: f64| (a - b).abs() < 1e-6 * per);
-                        let wave = if eq(pw, 0.0) && eq(tr, per / 2.0) && eq(tf, per / 2.0) { Wave::Triangle { amp, freq } }
-                            else if eq(pw, 0.0) && eq(tr, per) && eq(tf, 0.0) { Wave::Sawtooth { amp, freq } }
-                            else { Wave::Square { amp, freq, duty: pw / per } };
+                        let f = (td / per).rem_euclid(1.0); // the delay inside one period is the phase advance left over
+                        let phase = if f < 1e-9 || 1.0 - f < 1e-9 { 0.0 } else { 360.0 * (1.0 - f) };
+                        let wave = if eq(pw, 0.0) && eq(tr, per / 2.0) && eq(tf, per / 2.0) { Wave::Triangle { amp, freq, phase } }
+                            else if eq(pw, 0.0) && eq(tr, per) && eq(tf, 0.0) { Wave::Sawtooth { amp, freq, phase } }
+                            else { Wave::Square { amp, freq, duty: pw / per, phase } };
                         ((v1 + v2) / 2.0, Some(wave))
                     }
                     _ => (src()?, None),

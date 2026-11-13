@@ -27,26 +27,29 @@ pub enum PartKind {
 }
 
 /// Time-varying part of a voltage source, added to its `volts` offset. `amp` is the peak; a square wave is high for the first `duty` (0 to 1, default 0.5) of each period.
+/// `phase` (degrees, default 0) advances the wave: 90 starts a sine at its peak.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "shape")]
 pub enum Wave {
-    Sine { amp: f64, freq: f64 },
-    Square { amp: f64, freq: f64, #[serde(default = "half")] duty: f64 },
+    Sine { amp: f64, freq: f64, #[serde(default)] phase: f64 },
+    Square { amp: f64, freq: f64, #[serde(default = "half")] duty: f64, #[serde(default)] phase: f64 },
     /// Rises from -amp to +amp in the first half period, falls back in the second.
-    Triangle { amp: f64, freq: f64 },
+    Triangle { amp: f64, freq: f64, #[serde(default)] phase: f64 },
     /// Rises from -amp to +amp over each period, then jumps back.
-    Sawtooth { amp: f64, freq: f64 },
+    Sawtooth { amp: f64, freq: f64, #[serde(default)] phase: f64 },
 }
 
 fn half() -> f64 { 0.5 }
 
 impl Wave {
     pub fn at(&self, offset: f64, t: f64) -> f64 {
+        let (amp, freq, phase) = match *self { Wave::Sine { amp, freq, phase } | Wave::Square { amp, freq, phase, .. } | Wave::Triangle { amp, freq, phase } | Wave::Sawtooth { amp, freq, phase } => (amp, freq, phase) };
+        let x = (t * freq + phase / 360.0).rem_euclid(1.0); // position in the period, 0 to 1
         match *self {
-            Wave::Sine { amp, freq } => offset + amp * (std::f64::consts::TAU * freq * t).sin(),
-            Wave::Square { amp, freq, duty } => offset + if (t * freq).fract() < duty { amp } else { -amp },
-            Wave::Triangle { amp, freq } => { let x = (t * freq).fract(); offset + amp * if x < 0.5 { 4.0 * x - 1.0 } else { 3.0 - 4.0 * x } }
-            Wave::Sawtooth { amp, freq } => offset + amp * (2.0 * (t * freq).fract() - 1.0),
+            Wave::Sine { .. } => offset + amp * (std::f64::consts::TAU * x).sin(),
+            Wave::Square { duty, .. } => offset + if x < duty { amp } else { -amp },
+            Wave::Triangle { .. } => offset + amp * if x < 0.5 { 4.0 * x - 1.0 } else { 3.0 - 4.0 * x },
+            Wave::Sawtooth { .. } => offset + amp * (2.0 * x - 1.0),
         }
     }
 }
