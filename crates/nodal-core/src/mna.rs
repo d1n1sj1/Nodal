@@ -568,6 +568,7 @@ fn newton_from(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel]
         }
         let dv = x[..prev.len()].iter().zip(&prev).map(|(a, b)| (a - b).abs()).fold(0.0, f64::max);
         let mut resid_ok = true;
+        let xv = if qs.is_empty() && ms.is_empty() && os.is_empty() { Vec::new() } else { nvec(&x, v0.len()) };
         for (idx, j) in js.iter().enumerate() {
             let v = nv(&x, j.a) - nv(&x, j.k);
             let (g, ieq) = lin[idx];
@@ -576,7 +577,7 @@ fn newton_from(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel]
             vj[idx] = pnjlim(v, vj[idx], j.nvt);
         }
         for (idx, q) in qs.iter().enumerate() {
-            let (xn, yn) = q.xy(&nvec(&x, v0.len()));
+            let (xn, yn) = q.xy(&xv);
             let (x0, y0) = vq[idx];
             let (lin, ev) = (&qlin[idx], q.eval(xn, yn));
             let (ic, ib) = (lin.ic + lin.dic[0] * (xn - x0) + lin.dic[1] * (yn - y0), lin.ib + lin.dib[0] * (xn - x0) + lin.dib[1] * (yn - y0));
@@ -584,7 +585,7 @@ fn newton_from(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel]
             vq[idx] = (pnjlim(xn, x0, VT), pnjlim(yn, y0, VT));
         }
         for (idx, m) in ms.iter().enumerate() {
-            let (xn, yn) = m.xy(&nvec(&x, v0.len()));
+            let (xn, yn) = m.xy(&xv);
             let (x0, y0) = vm[idx];
             let (lin, ev) = (&mlin[idx], m.eval(xn, yn));
             let id = lin.id + lin.gm * (xn - x0) + lin.gds * (yn - y0);
@@ -592,7 +593,7 @@ fn newton_from(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel]
             vm[idx] = (x0 + (xn - x0).clamp(-MOS_STEP, MOS_STEP), y0 + (yn - y0).clamp(-MOS_STEP, MOS_STEP));
         }
         for (idx, o) in os.iter().enumerate() {
-            let vd = o.vd(&nvec(&x, v0.len()));
+            let vd = o.vd(&xv);
             let (f0, df) = olin[idx];
             let f = o.f(vd).0;
             resid_ok &= (f - (f0 + df * (vd - vo[idx]))).abs() < 1e-9 + 1e-9 * f.abs();

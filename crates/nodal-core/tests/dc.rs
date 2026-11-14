@@ -126,3 +126,13 @@ fn current_source_drives_a_resistor() {
     assert!(near(d.node_voltages[1], 10.0)); // from -> to injects into node 1
     assert!(near(d.part_currents["I1"], 0.01));
 }
+
+#[test]
+fn huge_node_id_is_rejected_not_allocated() {
+    let c = Circuit { parts: vec![
+        p("V1", VSource { pos: n(4_000_000_000), neg: n(0), volts: 5.0, wave: None }),
+        p("R1", Resistor { a: n(4_000_000_000), b: n(0), ohms: 100.0, max_watts: 1.0 }),
+    ]};
+    assert!(matches!(dc_op(&c), Err(SimError::InvalidInput(_))));
+    assert!(matches!(nodal_core::transient::transient(&c, 1e-3, 1e-5), Err(SimError::InvalidInput(_))));
+}

@@ -11,11 +11,16 @@ pub struct DcResult {
 }
 
 const OPEN_SWITCH_SIEMENS: f64 = 1e-12;
+/// A node id above this is a bad or hand-edited file: every solver allocates per node, so it is rejected before any allocation.
+const MAX_NODES: usize = 1_000_000;
 
 /// Rejects an empty circuit and non-finite / non-positive part values.
 pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
     if c.parts.is_empty() {
         return Err(SimError::EmptyCircuit);
+    }
+    if c.node_count() > MAX_NODES {
+        return Err(SimError::InvalidInput(format!("circuit uses node number {}; the limit is {}", c.node_count() - 1, MAX_NODES - 1)));
     }
     for p in &c.parts {
         let ok = match p.kind {
