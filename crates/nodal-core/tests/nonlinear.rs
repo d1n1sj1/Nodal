@@ -131,3 +131,18 @@ fn diode_reached_only_through_diode_is_not_floating() {
     ]};
     assert!(dc_op(&c).is_ok());
 }
+
+/// Diode off in series with an inductor: trapezoidal alone flips the node between +0.7 V and -0.7 V every step.
+#[test]
+fn rectifier_into_inductor_does_not_ring_when_the_diode_turns_off() {
+    use nodal_core::Wave;
+    let c = Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 0.0, wave: Some(Wave::Sine { amp: 10.0, freq: 50.0, phase: 0.0 }) }),
+        part("D1", Diode { anode: n(1), cathode: n(2) }),
+        part("L1", Inductor { a: n(2), b: n(3), henries: 0.1 }),
+        part("R1", Resistor { a: n(3), b: n(0), ohms: 100.0, max_watts: 10.0 }),
+    ]};
+    let r = transient(&c, 0.02, 1e-5).unwrap();
+    let flips = (1000..1900).filter(|&k| (r.node_voltages[k][2] - r.node_voltages[k + 1][2]).abs() > 0.3).count();
+    assert!(flips < 10, "node flipped {flips} times");
+}

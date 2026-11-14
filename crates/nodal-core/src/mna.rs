@@ -440,10 +440,24 @@ pub(crate) fn opamps(c: &Circuit, branch_of: &std::collections::HashMap<&str, us
 }
 
 /// Node voltages indexed by NodeId (ground = 0) from the solved unknowns.
-fn nvec(x: &[f64], n: usize) -> Vec<f64> {
+pub(crate) fn nvec(x: &[f64], n: usize) -> Vec<f64> {
     let mut v = vec![0.0; n];
     v[1..].copy_from_slice(&x[..n - 1]);
     v
+}
+
+/// Which side of its knee each junction, BJT and MOSFET sits on. A change between two transient steps marks a switching event.
+pub(crate) fn regions(js: &[Junction], qs: &[BjtModel], ms: &[MosModel], v: &[f64]) -> Vec<bool> {
+    let mut r: Vec<bool> = js.iter().map(|j| v[j.a as usize] - v[j.k as usize] > 20.0 * j.nvt).collect();
+    for q in qs {
+        let (x, y) = q.xy(v);
+        r.extend([x > 20.0 * VT, y > 20.0 * VT]);
+    }
+    for m in ms {
+        let (x, y) = m.xy(v);
+        r.extend([x > m.vth, y > x - m.vth]);
+    }
+    r
 }
 
 pub(crate) fn bjts(c: &Circuit) -> Vec<BjtModel> {
@@ -482,7 +496,35 @@ pub(crate) fn newton(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[Mos
     if rails && !os.is_empty() {
         if let Ok(x) = newton_from(base, js, qs, ms, os, v0, max_iters.min(20), cause, true, order) { return Ok(x); }
     }
-    newton_from(base, js, qs, ms, os, v0, max_iters, cause, false, order)
+    match newton_from(base, js, qs, ms, os, v0, max_iters, cause, false, order) {
+        Err(SimError::NoConvergence { .. }) if max_iters >= MAX_NEWTON_ITERS => ptc(base, js, qs, ms, os, v0, cause, order),
+        r => r,
+    }
+}
+
+/// Pseudo-transient continuation, for when plain Newton cycles because the answer is a jump away (two coupled
+/// transistors flipping: the quasi-static solution folds). Ties every node to its last solution with a conductance
+/// `g` and walks the anchor forward while `g` shrinks, as a stray capacitance on each node would; plain Newton
+/// then finishes from wherever the anchor got to. A lowered iteration cap (the test hook) skips this.
+fn ptc(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], os: &[OpampModel], v0: &[f64], cause: &str, order: &mut ColOrder) -> Result<Vec<f64>, SimError> {
+    let (mut anchor, mut g) = (v0.to_vec(), 1.0);
+    for _ in 0..300 {
+        let mut tied = base.clone();
+        for (n, &v) in anchor.iter().enumerate().skip(1) {
+            tied.conductance(n as u32, 0, g);
+            tied.current(0, n as u32, g * v);
+        }
+        match newton_from(&tied, js, qs, ms, os, &anchor, 30, cause, false, order) {
+            Ok(x) => {
+                anchor = nvec(&x, v0.len());
+                if let Ok(x) = newton_from(base, js, qs, ms, os, &anchor, 15, cause, false, order) { return Ok(x); }
+                g /= 3.0;
+            }
+            Err(SimError::NoConvergence { .. }) if g < 1e9 => g *= 4.0,
+            Err(e) => return Err(e),
+        }
+    }
+    Err(SimError::NoConvergence { iterations: 300 })
 }
 
 fn newton_from(base: &Stamper, js: &[Junction], qs: &[BjtModel], ms: &[MosModel], os: &[OpampModel], v0: &[f64], max_iters: u32, cause: &str, sat: bool, order: &mut ColOrder) -> Result<Vec<f64>, SimError> {

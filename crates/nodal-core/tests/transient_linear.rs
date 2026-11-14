@@ -142,3 +142,65 @@ fn phase_advances_every_shape_and_must_be_finite() {
     assert_eq!(sq.node_voltages[6][1], 1.0); // x = 0.6 - 0.25 = 0.35: high
     assert!(matches!(transient(&mk(Wave::Sine { amp: 1.0, freq: 100.0, phase: f64::NAN }), 0.01, 0.001), Err(SimError::InvalidInput(_))));
 }
+
+#[test]
+fn parallel_capacitors_and_a_capacitor_across_a_source_start() {
+    let r = |extra: Vec<Part>| {
+        let mut parts = vec![
+            part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
+            part("R1", Resistor { a: n(1), b: n(2), ohms: 1000.0, max_watts: 1.0 }),
+            part("C1", Capacitor { a: n(2), b: n(0), farads: 1e-6 }),
+        ];
+        parts.extend(extra);
+        transient(&Circuit { parts }, 5e-3, 1e-5).unwrap()
+    };
+    // second capacitor in parallel: RC with 2 uF, tau = 2 ms
+    let p = r(vec![part("C2", Capacitor { a: n(2), b: n(0), farads: 1e-6 })]);
+    let k = at(&p.times, 2e-3);
+    assert!((p.node_voltages[k][2] - 5.0 * (1.0 - (-1.0f64).exp())).abs() < 0.05, "{}", p.node_voltages[k][2]);
+    // capacitor straight across the battery: no error, node 1 stays at 5 V from the first sample
+    let s = r(vec![part("C2", Capacitor { a: n(1), b: n(0), farads: 1e-6 })]);
+    assert!(s.node_voltages.iter().all(|v| (v[1] - 5.0).abs() < 1e-9));
+    assert_eq!(s.part_currents["C2"][0], 0.0);
+}
+
+#[test]
+fn capacitive_divider_shares_a_step_by_charge() {
+    let c = Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 6.0, wave: None }),
+        part("C1", Capacitor { a: n(1), b: n(2), farads: 2e-6 }),
+        part("C2", Capacitor { a: n(2), b: n(0), farads: 1e-6 }),
+        part("R1", Resistor { a: n(2), b: n(0), ohms: 1e9, max_watts: 1.0 }),
+    ]};
+    let r = transient(&c, 1e-3, 1e-5).unwrap();
+    // 2 uF over 1 uF: the middle node takes 2/3 of the step
+    assert!((r.node_voltages[1][2] - 4.0).abs() < 1e-3, "{}", r.node_voltages[1][2]);
+}
+
+#[test]
+fn series_inductors_carry_one_current() {
+    let c = Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
+        part("L1", Inductor { a: n(1), b: n(2), henries: 10e-3 }),
+        part("L2", Inductor { a: n(2), b: n(3), henries: 10e-3 }),
+        part("R1", Resistor { a: n(3), b: n(0), ohms: 100.0, max_watts: 1.0 }),
+    ]};
+    let r = transient(&c, 500e-6, 0.1e-6).unwrap();
+    assert!(r.part_currents["L1"][0].abs() < 1e-9);
+    let k = at(&r.times, 200e-6); // tau = 20 mH / 100 ohm = 200 us
+    let want = 0.05 * (1.0 - (-1.0f64).exp());
+    assert!((r.part_currents["L2"][k] - want).abs() / want < 0.01, "{}", r.part_currents["L2"][k]);
+    assert!((r.part_currents["L1"][k] - r.part_currents["L2"][k]).abs() < 1e-9);
+}
+
+#[test]
+fn first_sample_sees_the_wave() {
+    use nodal_core::Wave;
+    let go = |w: Wave| transient(&Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 0.0, wave: Some(w) }),
+        part("R1", Resistor { a: n(1), b: n(0), ohms: 100.0, max_watts: 1.0 }),
+    ]}, 1e-3, 1e-4).unwrap().node_voltages[0][1];
+    assert!((go(Wave::Sine { amp: 1.0, freq: 100.0, phase: 90.0 }) - 1.0).abs() < 1e-9);
+    assert!((go(Wave::Square { amp: 1.0, freq: 100.0, duty: 0.5, phase: 0.0 }) - 1.0).abs() < 1e-9);
+    assert!((go(Wave::Triangle { amp: 1.0, freq: 100.0, phase: 0.0 }) + 1.0).abs() < 1e-9);
+}

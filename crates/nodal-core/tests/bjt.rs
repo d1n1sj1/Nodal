@@ -77,3 +77,24 @@ fn bjt_json_roundtrip() {
     let c = npn(5.0, 100e3, 100.0, 0.1);
     assert_eq!(Circuit::from_json(&c.to_json()).unwrap(), c);
 }
+
+/// Two-transistor astable: used to fail with NoConvergence at the first regenerative switch.
+#[test]
+fn astable_multivibrator_runs_through_its_switching() {
+    let q = |id: &str, c: u32, b: u32| part(id, Bjt { c: n(c), b: n(b), e: n(0), pnp: false, beta: 100.0, max_amps: 1.0 });
+    let r_ = |id: &str, a: u32, b: u32, ohms: f64| part(id, Resistor { a: n(a), b: n(b), ohms, max_watts: 10.0 });
+    let c = Circuit { parts: vec![
+        part("V1", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
+        r_("RC1", 1, 2, 1000.0), r_("RC2", 1, 3, 1000.0), r_("RB1", 1, 4, 47e3), r_("RB2", 1, 5, 47e3),
+        part("C1", Capacitor { a: n(2), b: n(5), farads: 10e-9 }),
+        part("C2", Capacitor { a: n(3), b: n(4), farads: 12e-9 }),
+        q("Q1", 2, 4), q("Q2", 3, 5),
+    ]};
+    let r = transient(&c, 3e-3, 1e-6).unwrap();
+    // both collectors swing between saturation and the rail more than once
+    for node in [2, 3] {
+        let lo = r.node_voltages.iter().filter(|v| v[node] < 0.5).count();
+        let hi = r.node_voltages.iter().filter(|v| v[node] > 4.0).count();
+        assert!(lo > 100 && hi > 100, "node {node}: low {lo}, high {hi}");
+    }
+}

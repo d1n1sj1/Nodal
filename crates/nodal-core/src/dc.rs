@@ -36,6 +36,22 @@ pub(crate) fn validate(c: &Circuit) -> Result<(), SimError> {
     Ok(())
 }
 
+/// Rejects a circuit with no ground or a node with fewer than two pins.
+pub(crate) fn topology(c: &Circuit) -> Result<(), SimError> {
+    let n = c.node_count();
+    let mut pins = vec![0u32; n];
+    for p in &c.parts {
+        for k in p.nodes() { pins[k as usize] += 1; }
+    }
+    if pins[0] == 0 {
+        return Err(SimError::NoGround);
+    }
+    match (1..n).find(|&i| pins[i] < 2) {
+        Some(i) => Err(SimError::FloatingNode(i as u32)),
+        None => Ok(()),
+    }
+}
+
 /// DC operating point. Diodes/LEDs are solved by Newton iteration (see `mna::newton`); a linear circuit is one solve.
 pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
     dc_op_with_limit(c, MAX_NEWTON_ITERS)
@@ -45,17 +61,8 @@ pub fn dc_op(c: &Circuit) -> Result<DcResult, SimError> {
 #[doc(hidden)]
 pub fn dc_op_with_limit(c: &Circuit, max_iters: u32) -> Result<DcResult, SimError> {
     validate(c)?;
+    topology(c)?;
     let n = c.node_count();
-    let mut pins = vec![0u32; n];
-    for p in &c.parts {
-        for k in p.nodes() { pins[k as usize] += 1; }
-    }
-    if pins[0] == 0 {
-        return Err(SimError::NoGround);
-    }
-    if let Some(i) = (1..n).find(|&i| pins[i] < 2) {
-        return Err(SimError::FloatingNode(i as u32));
-    }
 
     // Every node needs a DC path to ground (capacitors, current sources and open switches carry none; diodes/LEDs count via gmin).
     let mut uf: Vec<usize> = (0..n).collect();

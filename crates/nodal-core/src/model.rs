@@ -52,6 +52,14 @@ impl Wave {
             Wave::Sawtooth { .. } => offset + amp * (2.0 * x - 1.0),
         }
     }
+
+    /// True when a square or sawtooth wave moves by more than its peak between `t0` and `t1`: an edge, not a slope.
+    pub fn jumps(&self, t0: f64, t1: f64) -> bool {
+        match *self {
+            Wave::Square { amp, .. } | Wave::Sawtooth { amp, .. } => (self.at(0.0, t1) - self.at(0.0, t0)).abs() > amp,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

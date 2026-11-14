@@ -62,3 +62,18 @@ fn mosfet_json_roundtrip() {
     let c = nmos(4.0, 0.002, 0.5);
     assert_eq!(Circuit::from_json(&c.to_json()).unwrap(), c);
 }
+
+/// 1 ns of load capacitance at a 1 us step: trapezoidal alone overshoots both rails by 0.3 V.
+#[test]
+fn cmos_inverter_with_a_coarse_step_stays_inside_the_rails() {
+    use nodal_core::Wave;
+    let c = Circuit { parts: vec![
+        part("VDD", VSource { pos: n(1), neg: n(0), volts: 5.0, wave: None }),
+        part("VIN", VSource { pos: n(2), neg: n(0), volts: 2.5, wave: Some(Wave::Square { amp: 2.5, freq: 100e3, duty: 0.5, phase: 0.0 }) }),
+        part("MP", Mosfet { d: n(3), g: n(2), s: n(1), pmos: true, vth: 1.0, kp: 2e-3, max_amps: 1.0 }),
+        part("MN", Mosfet { d: n(3), g: n(2), s: n(0), pmos: false, vth: 1.0, kp: 2e-3, max_amps: 1.0 }),
+        part("CL", Capacitor { a: n(3), b: n(0), farads: 1e-9 }),
+    ]};
+    let r = transient(&c, 30e-6, 1e-6).unwrap();
+    assert!(r.node_voltages.iter().all(|v| v[3] > -0.05 && v[3] < 5.05));
+}
